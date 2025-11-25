@@ -1,4 +1,4 @@
-# Nearby Finder Frontend
+# Nearby Locator Frontend
 
 Modern React application for finding nearby places using geolocation.
 
