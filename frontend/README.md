@@ -1,4 +1,4 @@
-# Nearby Location Frontend
+# Nearby Locator Frontend
 
 Modern React application for finding nearby places using geolocation with advanced AI-powered chat interface and interactive animations.
 
