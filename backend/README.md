@@ -1,6 +1,6 @@
-# Nearby Finder Backend
+# Nearby Locator Backend
 
-Backend API for the Nearby Finder application using Google Places API.
+Backend API for the Nearby Locator application using Google Places API.
 
 ## Setup Instructions
 
