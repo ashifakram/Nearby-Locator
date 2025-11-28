@@ -1,11 +1,11 @@
 # Nearby Locator Frontend
 
-Modern React application for finding nearby places using geolocation with advanced AI-powered chat interface and interactive animations.
+Modern React application for finding nearby places using geolocation with advanced Smart chat interface and interactive animations.
 
 ## ✨ Features
 
-### 🤖 AI Chat Assistant
-- Conversational AI interface for discovering nearby places
+### 🤖 smart chat Assistant
+- Conversational Smart Search interface for discovering nearby places
 - Natural language processing to understand user queries
 - Automatic parsing of location categories and search radius
 - Smart error handling with helpful prompts

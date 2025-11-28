@@ -35,7 +35,7 @@ const TypingIndicator = ({ isDark }) => (
 );
 
 // Message component with modern design
-const Message = ({ text, isUser, timestamp, isDark }) => {
+const Message = ({ text, isUser, timestamp, isDark, places }) => {
   return (
     <div
       className={`flex gap-3 mb-6 ${isUser ? 'flex-row-reverse' : 'flex-row'} animate-fade-in`}
@@ -52,6 +52,47 @@ const Message = ({ text, isUser, timestamp, isDark }) => {
           }`}
         >
           <p className="text-[15px] leading-relaxed whitespace-pre-line">{text}</p>
+          
+          {/* Render places with clickable links */}
+          {places && places.length > 0 && (
+            <div className="mt-3 space-y-3">
+              {places.map((place, idx) => (
+                <div key={idx} className={`p-3 rounded-xl ${isDark ? 'bg-slate-600/50' : 'bg-gray-100/50'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p className="font-semibold text-[15px] mb-1">
+                        {idx + 1}. 📍 {place.name}
+                      </p>
+                      <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                        {place.address || "Address not available"}
+                      </p>
+                      {place.rating && (
+                        <p className={`text-sm mt-1 ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                          ⭐ {place.rating}
+                        </p>
+                      )}
+                    </div>
+                    <a
+                      href={place.map_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 ${
+                        isDark 
+                          ? 'bg-cyan-600 hover:bg-cyan-700 text-white' 
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="inline mr-1">
+                        <path d="M12 21C15.5 17.4 19 14.1764 19 10.2C19 6.22355 15.866 3 12 3C8.13401 3 5 6.22355 5 10.2C5 14.1764 8.5 17.4 12 21Z" fill="currentColor"/>
+                        <circle cx="12" cy="10" r="2.5" fill="white"/>
+                      </svg>
+                      Map
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         {timestamp && (
           <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-1.5 px-2`}>
@@ -244,7 +285,7 @@ function App() {
   const [isDark, setIsDark] = useState(true);
   const [messages, setMessages] = useState([
     { 
-      text: "👋 Hi! I'm your Nearby Finder AI Assistant. I can help you discover amazing places around you like restaurants, hospitals, ATMs, and more.\n\nTry asking: 'Find restaurants within 2 km' or use the quick actions below!", 
+      text: "👋 Hi! I'm your Nearby Locator Assistant. I can help you discover amazing places around you like restaurants, hospitals, ATMs, and more.\n\nTry asking: 'Find restaurants within 2 km' or use the quick actions below!", 
       isUser: false,
       timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     }
@@ -297,9 +338,9 @@ function App() {
     setMessages((prev) => [...prev, { text, isUser: true, timestamp }]);
   };
 
-  const appendBotMessage = (text) => {
+  const appendBotMessage = (text, places = null) => {
     const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    setMessages((prev) => [...prev, { text, isUser: false, timestamp }]);
+    setMessages((prev) => [...prev, { text, isUser: false, timestamp, places }]);
   };
 
   // Check if message is a greeting
@@ -309,33 +350,225 @@ function App() {
     return greetings.some(greeting => lowerMsg === greeting || lowerMsg.startsWith(greeting + " "));
   };
 
-  // Parse user input for category and radius
+  // Enhanced fuzzy string matching (Levenshtein distance)
+  const fuzzyMatch = (str1, str2, threshold = 2) => {
+    const s1 = str1.toLowerCase();
+    const s2 = str2.toLowerCase();
+    
+    // Exact match
+    if (s1 === s2) return true;
+    
+    // Contains match
+    if (s1.includes(s2) || s2.includes(s1)) return true;
+    
+    // Levenshtein distance for typo tolerance
+    const len1 = s1.length;
+    const len2 = s2.length;
+    const matrix = Array(len1 + 1).fill(null).map(() => Array(len2 + 1).fill(0));
+    
+    for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+    for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+    
+    for (let i = 1; i <= len1; i++) {
+      for (let j = 1; j <= len2; j++) {
+        const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost
+        );
+      }
+    }
+    
+    return matrix[len1][len2] <= threshold;
+  };
+
+  // Parse user input for category and radius with enhanced NLP
   const parseInput = (message) => {
+    const lowerMsg = message.toLowerCase();
+    
+    // Enhanced categories with more synonyms and multi-language support
     const categories = {
-      "restaurant": ["restaurant", "food", "eat", "dining"],
-      "hospital": ["hospital", "clinic", "medical center"],
-      "pharmacy": ["pharmacy", "medicine", "drugstore"],
-      "gas_station": ["gas station", "petrol", "fuel"],
-      "atm": ["atm", "cash"],
-      "school": ["school", "education"],
-      "shopping_mall": ["mall", "shopping"],
-      "bank": ["bank"],
-      "cafe": ["cafe", "coffee"],
-      "lodging": ["hotel", "lodging", "accommodation"]
+      "restaurant": [
+        // English
+        "restaurant", "restaurants", "food", "eat", "eating", "dining", "dine", "eatery", "eateries",
+        "bistro", "cafe", "cafeteria", "diner", "pizzeria", "burger", "fast food", "takeout",
+        // Common typos
+        "resturant", "restarant", "restraunt", "restuarant",
+        // Hindi/Hinglish
+        "khana", "khane", "restaurant", "dhaba",
+        // Spanish
+        "restaurante", "comida",
+        // French
+        "nourriture"
+      ],
+      "hospital": [
+        // English
+        "hospital", "hospitals", "clinic", "clinics", "medical center", "medical centre",
+        "health center", "health centre", "emergency", "doctor", "doctors", "healthcare",
+        "urgent care", "medical", "infirmary",
+        // Common typos
+        "hospitel", "hospitl", "hopital",
+        // Hindi/Hinglish
+        "hospital", "dawakhana", "clinic",
+        // Spanish
+        "clínica",
+        // French
+        "hôpital", "clinique"
+      ],
+      "pharmacy": [
+        // English
+        "pharmacy", "pharmacies", "medicine", "medicines", "drugstore", "drug store",
+        "chemist", "medical shop", "medical store", "apothecary", "pills", "medication",
+        // Common typos
+        "farmacy", "pharmcy", "pharmecy",
+        // Hindi/Hinglish
+        "medical", "dawai", "dawa", "medical shop",
+        // Spanish
+        "farmacia",
+        // French
+        "pharmacie"
+      ],
+      "gas_station": [
+        // English
+        "gas station", "gas", "petrol", "fuel", "petrol pump", "petrol station",
+        "fuel station", "filling station", "gasoline", "diesel",
+        // Common typos
+        "petrol pump", "gas staion", "petrol pamp",
+        // Hindi/Hinglish
+        "petrol pump", "petrol", "fuel",
+        // Spanish
+        "gasolinera",
+        // French
+        "station-service", "essence"
+      ],
+      "atm": [
+        // English
+        "atm", "atms", "cash", "money", "cash machine", "cash point", "cashpoint",
+        "automated teller", "withdraw", "withdrawal",
+        // Common typos
+        "atm machine", "cashpoint",
+        // Hindi/Hinglish
+        "atm", "cash", "paisa",
+        // Spanish
+        "cajero", "cajero automático",
+        // French
+        "distributeur", "guichet automatique"
+      ],
+      "school": [
+        // English
+        "school", "schools", "education", "college", "university", "institute",
+        "academy", "learning center", "educational institution",
+        // Common typos
+        "skool", "scool", "shool",
+        // Hindi/Hinglish
+        "school", "college", "vidyalaya", "pathshala",
+        // Spanish
+        "escuela", "colegio",
+        // French
+        "école"
+      ],
+      "shopping_mall": [
+        // English
+        "mall", "malls", "shopping", "shopping center", "shopping centre",
+        "shopping mall", "plaza", "market", "marketplace", "bazaar", "store", "shops",
+        // Common typos
+        "shoping", "shoping mall", "mal",
+        // Hindi/Hinglish
+        "mall", "market", "bazaar", "shopping",
+        // Spanish
+        "centro comercial",
+        // French
+        "centre commercial"
+      ],
+      "bank": [
+        // English
+        "bank", "banks", "banking", "financial", "atm", "branch",
+        // Common typos
+        "bnk", "banck",
+        // Hindi/Hinglish
+        "bank", "banking",
+        // Spanish
+        "banco",
+        // French
+        "banque"
+      ],
+      "cafe": [
+        // English
+        "cafe", "cafes", "café", "coffee", "coffee shop", "coffeehouse",
+        "tea", "tea shop", "starbucks", "barista", "espresso",
+        // Common typos
+        "caffe", "coffe", "cofee",
+        // Hindi/Hinglish
+        "cafe", "coffee shop", "chai",
+        // Spanish
+        "cafetería",
+        // French
+        "café"
+      ],
+      "lodging": [
+        // English
+        "hotel", "hotels", "lodging", "accommodation", "accommodations", "motel",
+        "inn", "resort", "guest house", "guesthouse", "hostel", "stay", "room",
+        // Common typos
+        "hotl", "accomodation", "acommodation",
+        // Hindi/Hinglish
+        "hotel", "guest house",
+        // Spanish
+        "alojamiento",
+        // French
+        "hôtel", "hébergement"
+      ]
     };
 
+    // Find category using fuzzy matching
     let foundCategory = null;
+    let maxMatches = 0;
+    
     for (const [category, keywords] of Object.entries(categories)) {
-      if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
+      let matches = 0;
+      for (const keyword of keywords) {
+        if (fuzzyMatch(lowerMsg, keyword, 2)) {
+          matches++;
+        }
+      }
+      if (matches > maxMatches) {
+        maxMatches = matches;
         foundCategory = category;
-        break;
       }
     }
 
-    const radiusMatch = message.match(/(\d+(\.\d+)?)\s?km/);
+    // Enhanced radius detection with multiple formats
     let radius = null;
-    if (radiusMatch) {
-      radius = radiusMatch[1];
+    
+    // Match various formats: "5 km", "5km", "5 kilometers", "5 kms", "within 5", "5 k"
+    const radiusPatterns = [
+      /(\d+(?:\.\d+)?)\s*(?:km|kms|kilometer|kilometers|kilometre|kilometres|k)\b/i,
+      /within\s+(\d+(?:\.\d+)?)/i,
+      /(\d+(?:\.\d+)?)\s*(?:km|k)\b/i,
+      /around\s+(\d+(?:\.\d+)?)/i,
+      /about\s+(\d+(?:\.\d+)?)/i,
+      /(\d+(?:\.\d+)?)\s+(?:km|kilometer)/i
+    ];
+    
+    for (const pattern of radiusPatterns) {
+      const match = lowerMsg.match(pattern);
+      if (match) {
+        radius = match[1];
+        break;
+      }
+    }
+    
+    // If no explicit radius but number found, assume km
+    if (!radius) {
+      const numberMatch = lowerMsg.match(/\b(\d+(?:\.\d+)?)\b/);
+      if (numberMatch && foundCategory) {
+        const num = parseFloat(numberMatch[1]);
+        // Only use if reasonable (2-20 km range)
+        if (num >= 2 && num <= 20) {
+          radius = numberMatch[1];
+        }
+      }
     }
 
     return { category: foundCategory, radius };
@@ -349,7 +582,8 @@ function App() {
       return;
     }
     try {
-      const response = await fetch("http://localhost:5000/nearby", {
+      const backendUrl = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+      const response = await fetch(`${backendUrl}/nearby`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -361,14 +595,16 @@ function App() {
       });
 
       const data = await response.json();
-      if (!data.results || data.results.length === 0) {
+      
+      // Check if backend returned an error
+      if (data.status === "error") {
+        appendBotMessage(data.message);
+      } else if (!data.results || data.results.length === 0) {
         appendBotMessage(`😕 Sorry, I couldn't find any ${category}s within ${radius} km of your location. Try increasing the search radius or searching for a different category.`);
       } else {
-        const placesList = data.results
-          .slice(0, 5)
-          .map((place, i) => `${i + 1}. 📍 ${place.name}\n   ${place.address || "Address not available"}`)
-          .join("\n\n");
-        appendBotMessage(`✨ Here are the top ${category}s within ${radius} km:\n\n${placesList}\n\nNeed more options? Just ask!`);
+        // Show all results (Google Places API typically returns up to 20 results)
+        const topPlaces = data.results;
+        appendBotMessage(`✨ Here are ${topPlaces.length} ${category}s within ${radius} km:`, topPlaces);
       }
       
       // Add restart prompt after a delay
@@ -475,7 +711,7 @@ function App() {
       setIsTyping(true);
       
       setTimeout(() => {
-        appendBotMessage("👋 Hi! I'm your Nearby Finder AI Assistant. I can help you discover places around you like restaurants, hospitals, ATMs, and more.\n\nTry asking: 'Find restaurants within 2 km' or use the quick actions below!");
+        appendBotMessage("👋 Hi! I'm your Nearby Locator Assistant. I can help you discover places around you like restaurants, hospitals, ATMs, and more.\n\nTry asking: 'Find restaurants within 2 km' or use the quick actions below!");
         setIsTyping(false);
         setShowQuickActions(true);
         setShowDistanceSelector(false);
@@ -583,7 +819,7 @@ function App() {
               <LocationIcon width={24} height={24} color="white" />
             </div>
             <div>
-              <h1 className="font-bold text-xl text-white" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>Nearby Finder AI</h1>
+              <h1 className="font-bold text-xl text-white" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>Nearby Locator</h1>
               <p className="text-sm text-white/95" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>Discover places around you</p>
             </div>
           </div>
@@ -601,7 +837,7 @@ function App() {
         }`} aria-live="polite" aria-relevant="additions">
           <div className="max-w-3xl mx-auto">
             {messages.map((msg, idx) => (
-              <Message key={idx} text={msg.text} isUser={msg.isUser} timestamp={msg.timestamp} isDark={isDark} />
+              <Message key={idx} text={msg.text} isUser={msg.isUser} timestamp={msg.timestamp} isDark={isDark} places={msg.places} />
             ))}
             
             {isTyping && (
