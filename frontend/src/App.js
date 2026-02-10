@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import LocationIcon from "./icons/LocationIcon";
 import LoaderIcon from "./icons/LoaderIcon";
-import GridScan from "./components/GridScan";
 
 // Bot Avatar Component
 const BotAvatar = ({ isDark }) => (
@@ -46,8 +45,8 @@ const Message = ({ text, isUser, timestamp, isDark, places }) => {
       <div className={`flex flex-col max-w-[75%] sm:max-w-[65%] ${isUser ? 'items-end' : 'items-start'}`}>
         <div
           className={`px-5 py-3 rounded-3xl shadow-md backdrop-blur-sm transition-all duration-300 hover:shadow-lg ${isUser
-              ? `bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-tr-sm`
-              : `${isDark ? 'bg-slate-700 text-gray-100 border border-slate-600' : 'bg-white text-gray-800 border border-gray-200'} rounded-tl-sm`
+            ? `bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-tr-sm`
+            : `${isDark ? 'bg-slate-700 text-gray-100 border border-slate-600' : 'bg-white text-gray-800 border border-gray-200'} rounded-tl-sm`
             }`}
         >
           <p className="text-[15px] leading-relaxed whitespace-pre-line">{text}</p>
@@ -76,8 +75,8 @@ const Message = ({ text, isUser, timestamp, isDark, places }) => {
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 ${isDark
-                          ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        ? 'bg-cyan-600 hover:bg-cyan-700 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
                         }`}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="inline mr-1">
@@ -131,8 +130,8 @@ const QuickActions = ({ onAction, disabled, isDark }) => {
             onClick={() => onAction(action.category)}
             disabled={disabled}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 ${isDark
-                ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-white border border-slate-700'
+              ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600'
+              : 'bg-slate-800/80 hover:bg-slate-800 text-white border border-slate-700'
               }`}
           >
             {action.label}
@@ -145,8 +144,8 @@ const QuickActions = ({ onAction, disabled, isDark }) => {
             onClick={() => setShowDropdown(!showDropdown)}
             disabled={disabled}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-1 ${isDark
-                ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-white border border-slate-700'
+              ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600'
+              : 'bg-slate-800/80 hover:bg-slate-800 text-white border border-slate-700'
               }`}
           >
             <span>More</span>
@@ -163,8 +162,8 @@ const QuickActions = ({ onAction, disabled, isDark }) => {
 
           {showDropdown && (
             <div className={`absolute bottom-full mb-2 left-0 rounded-2xl shadow-2xl border animate-fade-in ${isDark
-                ? 'bg-slate-800 border-slate-700'
-                : 'bg-white border-gray-200'
+              ? 'bg-slate-800 border-slate-700'
+              : 'bg-white border-gray-200'
               }`} style={{ minWidth: '200px' }}>
               {dropdownActions.map((action, idx) => (
                 <button
@@ -175,8 +174,8 @@ const QuickActions = ({ onAction, disabled, isDark }) => {
                   }}
                   disabled={disabled}
                   className={`w-full px-4 py-3 text-left text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 ${isDark
-                      ? 'text-white hover:bg-slate-700 border-b border-slate-700 last:border-b-0'
-                      : 'text-gray-900 hover:bg-gray-100 border-b border-gray-200 last:border-b-0'
+                    ? 'text-white hover:bg-slate-700 border-b border-slate-700 last:border-b-0'
+                    : 'text-gray-900 hover:bg-gray-100 border-b border-gray-200 last:border-b-0'
                     }`}
                 >
                   {action.label}
@@ -204,8 +203,8 @@ const DistanceSelector = ({ onSelect, disabled, isDark }) => {
             onClick={() => onSelect(distance)}
             disabled={disabled}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${isDark
-                ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600'
-                : 'bg-slate-800/80 hover:bg-slate-800 text-white border border-slate-700'
+              ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600'
+              : 'bg-slate-800/80 hover:bg-slate-800 text-white border border-slate-700'
               }`}
           >
             {distance}
@@ -221,13 +220,13 @@ const LocationPermissionPopup = ({ isDark, onEnable, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className={`rounded-3xl shadow-2xl max-w-sm w-full p-6 border transition-colors duration-300 ${isDark
-          ? 'bg-slate-800 border-slate-700'
-          : 'bg-white border-gray-200'
+        ? 'bg-slate-800 border-slate-700'
+        : 'bg-white border-gray-200'
         }`}>
         <div className="flex items-center justify-center mb-4">
           <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isDark
-              ? 'bg-cyan-600/20'
-              : 'bg-blue-600/20'
+            ? 'bg-cyan-600/20'
+            : 'bg-blue-600/20'
             }`}>
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 21C15.5 17.4 19 14.1764 19 10.2C19 6.22355 15.866 3 12 3C8.13401 3 5 6.22355 5 10.2C5 14.1764 8.5 17.4 12 21Z" fill={isDark ? '#06B6D4' : '#0284C7'} stroke={isDark ? '#06B6D4' : '#0284C7'} strokeWidth="1.5" />
@@ -259,8 +258,8 @@ const LocationPermissionPopup = ({ isDark, onEnable, onClose }) => {
           <button
             onClick={onClose}
             className={`w-full py-3 rounded-2xl font-semibold transition-all duration-300 ${isDark
-                ? 'bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
+              ? 'bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white'
+              : 'bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900'
               }`}
           >
             Maybe Later
@@ -767,40 +766,25 @@ function App() {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 flex items-center justify-center p-4 relative overflow-hidden ${isDark
-        ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800'
-        : 'bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50'
+      ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800'
+      : 'bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50'
       }`}>
-      {/* GridScan Background Animation */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        <GridScan
-          sensitivity={0.55}
-          lineThickness={1}
-          linesColor="#392e4e"
-          gridScale={0.1}
-          scanColor="#6378CA"
-          scanOpacity={0.4}
-          enablePost
-          bloomIntensity={0.6}
-          chromaticAberration={0.002}
-          noiseIntensity={0.01}
-        />
-      </div>
 
       {/* Main Chat Container with Glassmorphism */}
       <div className={`w-full max-w-4xl h-[90vh] flex flex-col rounded-3xl shadow-2xl border overflow-hidden transition-colors duration-300 relative z-10 ${isDark
-          ? 'bg-slate-900/80 backdrop-blur-xl border-slate-700/50'
-          : 'bg-white/80 backdrop-blur-xl border-white/50'
+        ? 'bg-slate-900/80 backdrop-blur-xl border-slate-700/50'
+        : 'bg-white/80 backdrop-blur-xl border-white/50'
         }`}>
 
         {/* Header */}
         <header className={`px-6 py-4 flex items-center justify-between shadow-lg transition-colors duration-300 ${isDark
-            ? 'bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-700'
-            : 'bg-gradient-to-r from-blue-500 to-cyan-500 border-b border-blue-300'
+          ? 'bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-700'
+          : 'bg-gradient-to-r from-blue-500 to-cyan-500 border-b border-blue-300'
           }`}>
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center ring-2 transition-colors duration-300 ${isDark
-                ? 'bg-gradient-to-br from-cyan-500 to-blue-600 ring-cyan-400/30'
-                : 'bg-white/30 ring-white/60'
+              ? 'bg-gradient-to-br from-cyan-500 to-blue-600 ring-cyan-400/30'
+              : 'bg-white/30 ring-white/60'
               }`}>
               <LocationIcon width={24} height={24} color="white" />
             </div>
@@ -854,8 +838,8 @@ function App() {
 
         {/* Input Area */}
         <footer className={`border-t transition-colors duration-300 p-4 ${isDark
-            ? 'bg-slate-800/50 border-slate-700 backdrop-blur-xl'
-            : 'bg-white/50 border-white backdrop-blur-xl'
+          ? 'bg-slate-800/50 border-slate-700 backdrop-blur-xl'
+          : 'bg-white/50 border-white backdrop-blur-xl'
           }`}>
           <div className="max-w-3xl mx-auto flex gap-3">
             <div className="flex-grow">
@@ -867,8 +851,8 @@ function App() {
                 placeholder="Type your message here..."
                 disabled={loading}
                 className={`w-full resize-none rounded-2xl px-4 transition-colors duration-300 focus:outline-none focus:ring-2 focus:border-transparent shadow-lg scrollbar-hidden ${isDark
-                    ? 'bg-slate-700 text-white border border-slate-600 focus:ring-cyan-500 placeholder:text-gray-400'
-                    : 'bg-white text-gray-800 border border-gray-200 focus:ring-blue-500 placeholder:text-gray-400'
+                  ? 'bg-slate-700 text-white border border-slate-600 focus:ring-cyan-500 placeholder:text-gray-400'
+                  : 'bg-white text-gray-800 border border-gray-200 focus:ring-blue-500 placeholder:text-gray-400'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 aria-label="Chat message input"
                 style={{ height: '48px', maxHeight: '120px', lineHeight: '1.5', paddingTop: '10px', paddingBottom: '10px', overflow: 'hidden' }}
@@ -878,8 +862,8 @@ function App() {
               onClick={() => handleSend()}
               disabled={loading || input.trim() === ""}
               className={`h-12 px-6 rounded-2xl text-white font-semibold flex items-center justify-center gap-2 shadow-lg transition-all duration-300 hover:scale-105 disabled:hover:scale-100 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 ${isDark
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 disabled:from-slate-600 disabled:to-slate-700'
-                  : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500'
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 disabled:from-slate-600 disabled:to-slate-700'
+                : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500'
                 }`}
               aria-label="Send message"
             >
