@@ -15,8 +15,13 @@ const categories = {
     hospital: "hospital",
     medical: "pharmacy",
     pharmacy: "pharmacy",
-    "gas_station": "gas_station",
-    atm: "atm"
+    gas_station: "gas_station",
+    atm: "atm",
+    school: "school",
+    shopping_mall: "shopping_mall",
+    bank: "bank",
+    cafe: "cafe",
+    lodging: "lodging"
 };
 
 app.post("/nearby", async (req, res) => {
@@ -57,11 +62,40 @@ app.post("/nearby", async (req, res) => {
         console.log("\n✅ Google API Response Status:", response.data.status);
         console.log("📊 Total Results Found:", response.data.results?.length || 0);
 
-        if (response.data.status !== "OK") {
-            console.log("⚠️  API Warning:", response.data.status);
+        // Handle Google API errors (anything other than OK or ZERO_RESULTS)
+        if (response.data.status !== "OK" && response.data.status !== "ZERO_RESULTS") {
+            console.log("⚠️  API Error:", response.data.status);
             if (response.data.error_message) {
                 console.log("❌ Error Message:", response.data.error_message);
             }
+            
+            let errorMessage = "";
+            switch (response.data.status) {
+                case "REQUEST_DENIED":
+                    errorMessage = "🔒 Our location service is currently unavailable. We're working to fix this. Please try again later.";
+                    break;
+                case "INVALID_REQUEST":
+                    errorMessage = "😕 Something went wrong with your search. Please try again with a different location or category.";
+                    break;
+                case "OVER_QUERY_LIMIT":
+                    errorMessage = "⏳ We're experiencing high traffic right now. Please wait a moment and try your search again.";
+                    break;
+                case "UNKNOWN_ERROR":
+                    errorMessage = "😕 Something unexpected happened. Please try your search again.";
+                    break;
+                default:
+                    errorMessage = "😕 We're having trouble finding places right now. Please try again in a moment.";
+            }
+            
+            console.log("========================================\n");
+            return res.json({ status: "error", message: errorMessage });
+        }
+
+        // Check if results array exists and has data
+        if (!response.data.results || response.data.results.length === 0) {
+            console.log("\n📭 No results found");
+            console.log("========================================\n");
+            return res.json({ status: "success", results: [] });
         }
 
         const results = response.data.results.map((place, index) => {
@@ -98,14 +132,23 @@ app.post("/nearby", async (req, res) => {
         
         console.log("========================================\n");
         
-        res.json({ status: "error", message: error.message });
+        // Send user-friendly error message
+        res.json({ 
+            status: "error", 
+            message: "😕 We're having trouble connecting to our location service right now. Please try again in a few moments." 
+        });
     }
+});
+
+// Health check endpoint for Docker
+app.get("/health", (req, res) => {
+    res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
 });
 
 app.listen(5000, () => {
     console.log("\n🚀 ========================================");
     console.log("🚀 BACKEND SERVER STARTED SUCCESSFULLY");
-    console.log("🚀 ========================================");
+    console.log("� ==a======================================");
     console.log("📡 Server running on: http://localhost:5000");
     console.log("🔑 Google API Key:", GOOGLE_API_KEY ? "✓ Configured" : "✗ Missing");
     console.log("⏰ Started at:", new Date().toLocaleString());
