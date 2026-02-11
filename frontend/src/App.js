@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import LocationIcon from "./icons/LocationIcon";
 import LoaderIcon from "./icons/LoaderIcon";
 
-// Bot Avatar Component
+// Bot Avatar Components
 const BotAvatar = ({ isDark }) => (
   <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg flex-shrink-0 ring-2 ${isDark ? 'ring-cyan-400/50' : 'ring-cyan-300/50'}`}>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -14,7 +14,7 @@ const BotAvatar = ({ isDark }) => (
   </div>
 );
 
-// User Avatar Component
+// User Avatar Components
 const UserAvatar = ({ isDark }) => (
   <div className={`w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg flex-shrink-0 ring-2 ${isDark ? 'ring-emerald-400/50' : 'ring-emerald-300/50'}`}>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -101,7 +101,7 @@ const Message = ({ text, isUser, timestamp, isDark, places }) => {
   );
 };
 
-// Quick Action Buttons with Dropdown
+// Quick Action Buttons with Dropdowns
 const QuickActions = ({ onAction, disabled, isDark }) => {
   const [showDropdown, setShowDropdown] = useState(false);
 
