@@ -24,7 +24,6 @@ An intelligent location-based search application with Smart chat interface that 
 - Google Places API integration
 
 ### 🎨 Modern UI/UX
-- Interactive 3D background with Three.js
 - Glassmorphism design with dark theme
 - Responsive layout for mobile and desktop
 - Smooth animations and transitions
@@ -129,7 +128,6 @@ nearby-locator-Smart Search/
 │   ├── src/
 │   │   ├── App.js             # Main React component
 │   │   ├── components/        # React components
-│   │   │   └── GridScan.jsx   # 3D background animation
 │   │   ├── icons/             # SVG icon components
 │   │   └── index.js           # Entry point
 │   ├── public/                # Static assets
@@ -154,10 +152,7 @@ nearby-locator-Smart Search/
 
 ### Frontend
 - **React 19.2.0** - UI framework
-- **Three.js** - 3D graphics and animations
 - **Tailwind CSS** - Utility-first styling
-- **face-api.js** - Optional face tracking
-- **PostProcessing** - Visual effects (bloom, chromatic aberration)
 
 ### Backend
 - **Node.js 18+** - Runtime environment
@@ -477,13 +472,6 @@ docker-compose up
 
 ## 🎨 Features in Detail
 
-### 3D Background Animation
-- WebGL-powered grid visualization
-- Mouse tracking with smooth damping
-- Optional face tracking using face-api.js
-- Configurable scan animations
-- Post-processing effects (bloom, chromatic aberration)
-
 ### Chat Interface
 - Natural language understanding
 - Typing indicators
@@ -557,7 +545,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🙏 Acknowledgments
 
 - Google Places API for location data
-- Three.js for 3D graphics
 - React team for the framework
 - Tailwind CSS for styling
 - Docker for containerization
