@@ -3,7 +3,7 @@ import App from './App';
 
 test('renders Nearby Locator header', () => {
   render(<App />);
-  const headerElement = screen.getByText(/Nearby Locator/i);
+  const headerElement = screen.getByRole('heading', { name: /Nearby Locator/i });
   expect(headerElement).toBeInTheDocument();
 });
 
