@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: Nearby Locator API
+  version: 1.0.0
+  license:
+    name: Proprietary
+  description: |
+    # Authentication Lifecycle
+    1. **Signup:** User registers (`POST /auth/signup`). Status becomes `PENDING_VERIFICATION`.
+    2. **Email Verification:** User verifies email. Status becomes `ACTIVE`.
+    3. **Login:** User authenticates (`POST /auth/login`). Receives short-lived Access Token (JWT) and a secure `HttpOnly` Refresh Cookie.
+    4. **Protected APIs:** Client attaches `Authorization: Bearer <token>` to requests.
+    5. **Refresh:** Client calls `POST /auth/refresh` (passing CSRF headers). The backend validates the `HttpOnly` cookie and issues a fresh Access Token and rotated Refresh Cookie.
+    6. **Logout:** Client calls `POST /auth/logout` to revoke the session family and clear cookies.
+servers:
+  - url: /api
+    description: Base API URL
+security:
+  - BearerAuth: []
+paths:
+  /auth/signup:
+    $ref: './paths/auth.yaml#/Signup'
+  /auth/login:
+    $ref: './paths/auth.yaml#/Login'
+  /auth/google:
+    $ref: './paths/auth.yaml#/Google'
+  /auth/verify-email:
+    $ref: './paths/auth.yaml#/VerifyEmail'
+  /auth/resend-verification:
+    $ref: './paths/auth.yaml#/ResendVerification'
+  /auth/refresh:
+    $ref: './paths/auth.yaml#/Refresh'
+  /auth/logout:
+    $ref: './paths/auth.yaml#/Logout'
+  /auth/logout-all:
+    $ref: './paths/auth.yaml#/LogoutAll'
+  /auth/password/reset-request:
+    $ref: './paths/auth.yaml#/PasswordResetRequest'
+  /auth/password/reset:
+    $ref: './paths/auth.yaml#/PasswordReset'
+  /auth/password/change:
+    $ref: './paths/auth.yaml#/PasswordChange'
+  /users/profile:
+    $ref: './paths/users.yaml#/Profile'
+  /users/me/devices:
+    $ref: './paths/users.yaml#/Devices'
+  /users/me/devices/{sessionId}:
+    $ref: './paths/users.yaml#/RevokeDevice'
+  /users/me/permissions:
+    $ref: './paths/users.yaml#/Permissions'
+  /admin/roles:
+    $ref: './paths/admin.yaml#/Roles'
+  /admin/permissions:
+    $ref: './paths/admin.yaml#/Permissions'
+components:
+  securitySchemes:
+    $ref: './components/securitySchemes.yaml'
+  schemas:
+    $ref: './components/schemas.yaml'
+  responses:
+    $ref: './components/responses.yaml'
+  parameters:
+    $ref: './components/parameters.yaml'
+  examples:
+    $ref: './components/examples.yaml'
+  headers:
+    $ref: './components/headers.yaml'

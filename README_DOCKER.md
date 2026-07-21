@@ -158,7 +158,7 @@ GOOGLE_API_KEY=your_google_api_key_here
 
 **Frontend `.env.production`:**
 ```env
-REACT_APP_BACKEND_URL=http://localhost:5000
+VITE_BACKEND_URL=http://localhost:5000
 ```
 
 ### Port Configuration

@@ -1,0 +1,33 @@
+Roles:
+  get:
+    operationId: getRoles
+    tags: [Admin]
+    summary: Retrieve system roles
+    responses:
+      '200':
+        description: Roles retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+Permissions:
+  get:
+    operationId: getAdminPermissions
+    tags: [Admin]
+    summary: Retrieve system permissions matrix
+    responses:
+      '200':
+        description: Permissions retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'

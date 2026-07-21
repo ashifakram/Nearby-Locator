@@ -1,0 +1,15 @@
+Your design plan is exceptionally strong. Let's make a critical architectural adjustment before you write the files:
+
+1. Routing Infrastructure: Do NOT use a manual view state variable for conditional rendering. Install and configure `react-router-dom`. Set up a modern router configuration supporting clean URL paths:
+   - `/` -> Public LandingPage View
+   - `/about` -> Mission-Control AboutUs View
+   - `/login` -> The Cyberpunk Login Portal
+   - `/dashboard` -> The main Core App and Smart Chat Interface
+   - `/admin/analytics` -> The Telemetry Dashboard View
+
+2. Component Specifications:
+   - Ensure the `Navbar` component features a floating design layout using Tailwind's `fixed top-4 left-1/2 -translate-x-1/2 w-[92%]` properties to look like an ultra-modern floating island.
+   - Ensure the notification bell icon has a secondary absolute-positioned child `span` that flashes using the `animate-ping` utility if there are background anomalies.
+   - Make sure all charts in the Admin view are fully fluid and wrapped inside `<ResponsiveContainer>` elements so they look beautiful on mobile displays.
+
+You have full permission to run `npm install react-router-dom`, build out these layouts, and run the UI verification test suite. Proceed with the generation now!

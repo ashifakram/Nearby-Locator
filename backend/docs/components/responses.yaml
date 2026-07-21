@@ -1,0 +1,72 @@
+Success:
+  description: Successful operation
+  headers:
+    X-Request-ID:
+      $ref: 'headers.yaml#/XRequestID'
+  content:
+    application/json:
+      schema:
+        $ref: 'schemas.yaml#/StandardSuccess'
+
+BadRequest:
+  description: Validation failed or malformed request
+  headers:
+    X-Request-ID:
+      $ref: 'headers.yaml#/XRequestID'
+  content:
+    application/json:
+      schema:
+        $ref: 'schemas.yaml#/ValidationError'
+
+Unauthorized:
+  description: Authentication required or token expired
+  headers:
+    X-Request-ID:
+      $ref: 'headers.yaml#/XRequestID'
+  content:
+    application/json:
+      schema:
+        $ref: 'schemas.yaml#/StandardError'
+      examples:
+        TokenExpired:
+          $ref: 'examples.yaml#/TokenExpired'
+        TokenReplay:
+          $ref: 'examples.yaml#/TokenReplayDetected'
+
+Forbidden:
+  description: Insufficient permissions or CSRF failure
+  headers:
+    X-Request-ID:
+      $ref: 'headers.yaml#/XRequestID'
+  content:
+    application/json:
+      schema:
+        $ref: 'schemas.yaml#/StandardError'
+      examples:
+        PermissionDenied:
+          $ref: 'examples.yaml#/PermissionDenied'
+        CsrfBlocked:
+          $ref: 'examples.yaml#/CsrfBlocked'
+
+NotFound:
+  description: Resource not found
+  headers:
+    X-Request-ID:
+      $ref: 'headers.yaml#/XRequestID'
+  content:
+    application/json:
+      schema:
+        $ref: 'schemas.yaml#/StandardError'
+
+TooManyRequests:
+  description: Rate limit exceeded
+  headers:
+    X-Request-ID:
+      $ref: 'headers.yaml#/XRequestID'
+  content:
+    application/json:
+      schema:
+        $ref: 'schemas.yaml#/StandardError'
+      examples:
+        RateLimited:
+          $ref: 'examples.yaml#/RateLimited'

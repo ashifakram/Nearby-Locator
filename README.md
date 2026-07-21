@@ -60,7 +60,7 @@ node index.js
 # 3. Setup Frontend (in new terminal)
 cd frontend
 npm install
-npm start
+npm run dev
 ```
 
 **Access:** http://localhost:3000
@@ -190,12 +190,12 @@ GOOGLE_API_KEY=your_google_api_key_here
 **File:** `frontend/.env.production`
 
 ```env
-REACT_APP_BACKEND_URL=http://localhost:5000
+VITE_BACKEND_URL=http://localhost:5000
 ```
 
 **For production deployment, update to your backend URL:**
 ```env
-REACT_APP_BACKEND_URL=https://api.yourdomain.com
+VITE_BACKEND_URL=https://api.yourdomain.com
 ```
 
 ---
@@ -325,7 +325,7 @@ node index.js
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev
 ```
 
 ### Development with Docker

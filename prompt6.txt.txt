@@ -1,0 +1,20 @@
+You are an elite Lead UI/UX Engineer and Frontend Architect. Your goal is to completely rewrite the frontend using React, Tailwind CSS, and standard asset directories to create a futuristic, glassmorphic, mobile-responsive dashboard application.
+
+### Design Principles:
+- Palette: Void Dark background (#030712), Electric Cyan (#06b6d4) and Neon Fuchsia (#d946ef) highlights.
+- Elements: Glassmorphism (`backdrop-blur-xl`, translucent panels, glowing border frames).
+- Responsiveness: Liquid grids that map cleanly across mobile views up to massive desktop screens.
+
+### Execution Plan:
+1. Components Architecture:
+   - Create `frontend/src/components/QuantumLoader.jsx` incorporating a multi-layered spinning tech ring and pulsing core canvas.
+   - Create `frontend/src/components/Navbar.jsx` containing a floating blurred header pane and a live notification bell utilizing a neon ping pulse marker.
+   - Create `frontend/src/components/Footer.jsx` including analytical columns, clean social blocks, and mock infrastructure uptime markers.
+2. Views Development:
+   - Create `frontend/src/views/LandingPage.jsx`. Build an eye-catching hero header section with sleek neon text styles and call-to-action triggers.
+   - Implement a fluid Carousel component inside the landing view that cycles through descriptive features using mock placeholders for cinematic, sci-fi local mapping interfaces.
+   - Create `frontend/src/views/AboutUs.jsx` formatted like a clean mission control board detailing the architecture specs (React, Node, PostgreSQL 17, Redis).
+3. Routing & Setup:
+   - Mount these views inside `frontend/src/App.js`, wrapping them securely inside your core global layouts. Ensure the system handles loading toggles using the new `QuantumLoader` utility cleanly.
+
+Proceed to generate these visual UI components now. Ensure all files are modular, correctly importing modern utility hooks.

@@ -1,0 +1,10 @@
+BearerAuth:
+  type: http
+  scheme: bearer
+  bearerFormat: JWT
+  description: Short-lived access token.
+CookieAuth:
+  type: apiKey
+  in: cookie
+  name: refreshToken
+  description: HttpOnly secure refresh token cookie.

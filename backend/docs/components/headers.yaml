@@ -1,0 +1,5 @@
+XRequestID:
+  description: Unique identifier for the request, used for telemetry and tracing.
+  schema:
+    type: string
+    format: uuid

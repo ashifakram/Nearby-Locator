@@ -1,0 +1,8 @@
+SessionIdParam:
+  name: sessionId
+  in: path
+  description: The UUID of the device session
+  required: true
+  schema:
+    type: string
+    format: uuid

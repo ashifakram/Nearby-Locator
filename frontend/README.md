@@ -61,7 +61,7 @@ npm install
 
 ### Run Development Server
 ```bash
-npm start
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
@@ -119,7 +119,7 @@ Modern browsers **require HTTPS** for geolocation API (except on localhost). To 
 
 5. **Start the server:**
    ```bash
-   npm start
+   npm run dev
    ```
 
 6. **Access from mobile:**
@@ -195,7 +195,7 @@ Then create the `.env` file as shown above.
 
 ## 🛠️ Available Scripts
 
-### `npm start`
+### `npm run dev`
 Runs the app in development mode. The page will reload when you make changes.
 
 ### `npm test`
@@ -249,7 +249,7 @@ Builds the app for production to the `build` folder.
 
 ## 📚 Learn More
 
-- [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started)
+- [Vite documentation](https://vitejs.dev/guide/)
 - [React documentation](https://reactjs.org/)
 - [Tailwind CSS](https://tailwindcss.com/)
 

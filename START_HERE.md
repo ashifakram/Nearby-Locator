@@ -13,7 +13,7 @@ node index.js
 
 # Terminal 2 - Frontend  
 cd frontend
-npm start
+npm run dev
 ```
 
 ✅ Fastest  
@@ -68,7 +68,7 @@ chmod +x start-docker-dev.sh
 
 | Setup | Command | Nginx | Hot Reload | Size | Best For |
 |-------|---------|-------|------------|------|----------|
-| **No Docker** | `npm start` | ❌ | ✅ | - | Daily coding |
+| **No Docker** | `npm run dev` | ❌ | ✅ | - | Daily coding |
 | **Dev Docker** | `start-docker-dev.bat` | ❌ | ✅ | 300MB | Testing |
 | **Prod Docker** | `start-docker.bat` | ✅ | ❌ | 25MB | Deployment |
 
@@ -78,7 +78,7 @@ chmod +x start-docker-dev.sh
 
 **For you right now:**
 
-1. **Coding**: Use `npm start` (no Docker)
+1. **Coding**: Use `npm run dev` (no Docker)
 2. **Deploy**: Use `start-docker.bat` (production)
 
 **That's it!** Keep it simple. 🎉

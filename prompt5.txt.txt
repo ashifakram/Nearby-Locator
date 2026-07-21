@@ -1,0 +1,14 @@
+The roadmap for Phase 2 looks good conceptually, but your code snippets have severe architectural regression. You must fix these and implement Phase 2 completely based on our existing Phase 1 foundations:
+
+### Strict Architectural Constraints:
+1. ESM Only: Do NOT use require(). The entire backend is configured as "type": "module". Use ES Modules (import/export) exclusively.
+2. Maintain Response Interface: Every single API endpoint and error handler MUST use the unified response wrapper middleware from Phase 1 (`sendSuccess` / `sendError` from `responseFormatter.js`). Do not use raw `res.json()`.
+3. Integrate Roles: The dashboard route must verify tokens using our `authJwt.js` middleware and confirm the role is an admin (or validate against the email 'admin@locator.com').
+
+### Implementation Execution Steps:
+1. Migrations: Create Knex migrations for `user_sessions` and `system_errors`. Use UUID v4 primary keys and ensure all four audit columns (`created_at`, `updated_at`, `created_by`, `updated_by`) are explicitly defined.
+2. Telemetry Middleware: Implement `backend/middleware/analyticsTracker.js`. It must capture the incoming request, mock a country resolution based on the IP address/headers, and initialize/heartbeat a user session inside Redis.
+3. Controller & Errors: Implement `analyticsController.js` returning aggregated metrics for Recharts (traffic by country, error trends, time spent). Update `errorHandler.js` so that it seamlessly inserts uncaught exceptions into the `system_errors` table before using `sendError` to send a clean message back to the UI.
+4. Verification: Write the integration test under `backend/__tests__/analytics.test.js` using supertest, verify the strict JSON response format, run the migrations, and run the test suite.
+
+Proceed with the corrected files implementation now.

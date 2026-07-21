@@ -33,7 +33,7 @@ jobs:
 
       - name: Zip build artifact
         run: |
-          zip -r ../frontend-build-${{ github.ref_name }}-${{ github.sha }}.zip build
+          zip -r ../frontend-build-${{ github.ref_name }}-${{ github.sha }}.zip dist
 
       - name: Setup JFrog CLI
         uses: jfrog/setup-jfrog-cli@v4

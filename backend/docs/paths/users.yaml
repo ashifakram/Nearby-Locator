@@ -1,0 +1,61 @@
+Profile:
+  get:
+    operationId: getProfile
+    tags: [Users]
+    summary: Retrieve active user profile
+    responses:
+      '200':
+        description: Profile retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+Devices:
+  get:
+    operationId: getDevices
+    tags: [Users]
+    summary: List active devices/sessions for user
+    responses:
+      '200':
+        description: Devices retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+RevokeDevice:
+  delete:
+    operationId: revokeDevice
+    tags: [Users]
+    summary: Revoke a specific active device session
+    parameters:
+      - $ref: '../components/parameters.yaml#/SessionIdParam'
+    responses:
+      '200':
+        description: Device revoked successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+Permissions:
+  get:
+    operationId: getPermissions
+    tags: [Users]
+    summary: Hydrate active session permissions
+    responses:
+      '200':
+        description: Permissions hydrated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'

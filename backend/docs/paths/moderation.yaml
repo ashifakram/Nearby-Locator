@@ -1,0 +1,14 @@
+Reports:
+  post:
+    operationId: submitReport
+    tags: [Moderation]
+    summary: Submit a moderation report
+    responses:
+      '200':
+        description: Report submitted successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/schemas/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/responses/Unauthorized'

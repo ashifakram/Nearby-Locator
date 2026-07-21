@@ -1,0 +1,299 @@
+Signup:
+  post:
+    operationId: signupLocal
+    tags: [Auth]
+    summary: Register a new local account
+    security: []
+    x-rate-limit: 10 requests per hour
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+              email:
+                type: string
+              password:
+                type: string
+            required: [name, email, password]
+    responses:
+      '201':
+        description: Registration successful, user requires email verification
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '429':
+        $ref: '../components/responses.yaml#/TooManyRequests'
+
+Login:
+  post:
+    operationId: loginLocal
+    tags: [Auth]
+    summary: Authenticate a local user
+    security: []
+    x-rate-limit: 60 requests per hour
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+              password:
+                type: string
+            required: [email, password]
+    responses:
+      '200':
+        description: Login successful
+        headers:
+          Set-Cookie:
+            description: HttpOnly Refresh Token
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+      '429':
+        $ref: '../components/responses.yaml#/TooManyRequests'
+
+Google:
+  post:
+    operationId: loginGoogle
+    tags: [Auth]
+    summary: Authenticate via Google ID Token
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              tokenId:
+                type: string
+            required: [tokenId]
+    responses:
+      '200':
+        description: Authentication successful
+        headers:
+          Set-Cookie:
+            description: HttpOnly Refresh Token
+            schema:
+              type: string
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+Refresh:
+  post:
+    operationId: refreshToken
+    tags: [Auth]
+    summary: Rotate Access and Refresh Tokens
+    security:
+      - CookieAuth: []
+    responses:
+      '200':
+        description: Token rotation successful
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+Logout:
+  post:
+    operationId: logout
+    tags: [Auth]
+    summary: Revoke current session
+    responses:
+      '200':
+        description: Logout successful
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+LogoutAll:
+  post:
+    operationId: logoutAll
+    tags: [Auth]
+    summary: Revoke all sessions across all devices
+    responses:
+      '200':
+        description: Global logout successful
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+PasswordResetRequest:
+  post:
+    operationId: requestPasswordReset
+    tags: [Auth]
+    summary: Request a password reset email
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+            required: [email]
+    responses:
+      '200':
+        description: Email sent successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+PasswordReset:
+  post:
+    operationId: resetPassword
+    tags: [Auth]
+    summary: Reset password via email token
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              token:
+                type: string
+              newPassword:
+                type: string
+            required: [token, newPassword]
+    responses:
+      '200':
+        description: Password reset successful
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '400':
+        $ref: '../components/responses.yaml#/BadRequest'
+
+PasswordChange:
+  post:
+    operationId: changePassword
+    tags: [Auth]
+    summary: Change password for active user session
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              oldPassword:
+                type: string
+              newPassword:
+                type: string
+            required: [oldPassword, newPassword]
+    responses:
+      '200':
+        description: Password changed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+VerifyEmail:
+  post:
+    operationId: verifyEmail
+    tags: [Auth]
+    summary: Verify user email using token
+    security: []
+    x-rate-limit: 5 requests per hour
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              token:
+                type: string
+            required: [token]
+    responses:
+      '200':
+        description: Email verified successfully (or already verified)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '400':
+        description: Invalid, expired, or already consumed token
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardError'
+      '429':
+        $ref: '../components/responses.yaml#/TooManyRequests'
+
+ResendVerification:
+  post:
+    operationId: resendVerification
+    tags: [Auth]
+    summary: Resend email verification link
+    security: []
+    x-rate-limit: 3 requests per hour
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email:
+                type: string
+            required: [email]
+    responses:
+      '200':
+        description: Request processed (generic success for email enumeration defense)
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+      '409':
+        description: Account already active or verified
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardError'
+      '429':
+        $ref: '../components/responses.yaml#/TooManyRequests'

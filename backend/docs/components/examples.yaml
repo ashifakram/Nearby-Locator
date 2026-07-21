@@ -1,0 +1,88 @@
+TokenExpired:
+  summary: Token Expired Example
+  value:
+    success: false
+    status: 401
+    message: "Session expired. Please log in again."
+    data: null
+    error:
+      code: "TOKEN_EXPIRED"
+      details: null
+
+TokenReplayDetected:
+  summary: Refresh Token Replay Detected Example
+  value:
+    success: false
+    status: 401
+    message: "Security violation. Please log in again."
+    data: null
+    error:
+      code: "TOKEN_REPLAY_DETECTED"
+      details: null
+
+CsrfBlocked:
+  summary: CSRF Blocked Example
+  value:
+    success: false
+    status: 403
+    message: "Access denied: Custom verification headers missing."
+    data: null
+    error:
+      code: "CSRF_BLOCKED"
+      details: null
+
+PermissionDenied:
+  summary: Permission Denied Example
+  value:
+    success: false
+    status: 403
+    message: "Access Denied"
+    data: null
+    error:
+      code: "PERMISSION_DENIED"
+      details:
+        required_permission: "users.read"
+
+RateLimited:
+  summary: Rate Limit Exceeded Example
+  value:
+    success: false
+    status: 429
+    message: "Too many requests. Please try again later."
+    data: null
+    error:
+      code: "RATE_LIMITED"
+      details: null
+
+InvalidCredentials:
+  summary: Invalid Credentials Example
+  value:
+    success: false
+    status: 401
+    message: "Invalid email or password"
+    data: null
+    error:
+      code: "INVALID_CREDENTIALS"
+      details: null
+
+AccountLocked:
+  summary: Account Locked Example
+  value:
+    success: false
+    status: 403
+    message: "Account locked due to multiple failed login attempts."
+    data: null
+    error:
+      code: "ACCOUNT_LOCKED"
+      details: null
+
+EmailNotVerified:
+  summary: Email Not Verified Example
+  value:
+    success: false
+    status: 403
+    message: "Please verify your email to log in"
+    data: null
+    error:
+      code: "EMAIL_NOT_VERIFIED"
+      details: null
