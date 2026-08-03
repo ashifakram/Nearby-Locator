@@ -1,9 +1,0 @@
-Please read the plan you generated in `.claude\plans\can-you-read-the-prancy-pony.md`. 
-
-Proceed to execute Phase 1 exactly as specified. Ensure that:
-1. The PostgreSQL 17 schemas are initialized with all audit fields (`created_at`, `updated_at`, `created_by`, `updated_by`).
-2. The global API response wrapper and error handling middleware are created first to enforce the strict JSON interface layout.
-3. Redis brute-force protection middleware handles login throttling defensively.
-4. All specified auth endpoints (signup, login, google oauth upsert, delink, and GDPR hard delete) are fully implemented.
-
-Once the files are written, create and execute a test script to verify that the edge cases (like duplicate emails, brute-force locking, and wrong inputs) are completely handled and returning the correct error formatting. Do not finish until all tests pass.

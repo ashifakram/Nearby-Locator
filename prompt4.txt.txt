@@ -1,9 +1,0 @@
-The plan for Phase 2 is completely accurate. Please proceed with the full implementation:
-
-1. Create the migrations for `user_sessions` and `system_errors` with all necessary audit fields.
-2. Build the request tracking and Redis-backed session heartbeat middleware.
-3. Implement `analyticsController.js` and mount the protected admin route under GET `/api/analytics/dashboard`.
-4. Update `index.js` and modify your existing `errorHandler.js` so it automatically writes unhandled exceptions directly into the database.
-5. Write the comprehensive test suite in `backend/__tests__/analytics.test.js` to assert that telemetry is accurately harvested.
-
-You have full permission to write these files, update the entry points, run the migrations, and execute the test runner. Let me know when the tests pass!
