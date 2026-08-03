@@ -3,6 +3,7 @@
 .env.local
 .env.development
 .env.production
+.env.test
 backend/.env
 
 # Dependencies
@@ -35,3 +36,18 @@ Thumbs.db
 
 # Testing
 coverage/
+
+# Dev-only / scratch files — do not commit
+prompt*.txt.txt
+fixsecrets.ps1
+nearby_locator_architecture.md
+ACCOUNT_MANAGEMENT_IMPLEMENTATION_PLAN.md
+ADMIN_PLATFORM_IMPLEMENTATION_PLAN.md
+audit_script/
+browser-test/
+docs_generated/
+backend/scratch/
+backend/scratch_*.js
+backend/seed_*.js
+backend/test_verification.js
+backend/verify.js
