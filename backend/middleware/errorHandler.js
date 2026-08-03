@@ -9,12 +9,13 @@ export const errorHandler = (err, req, res, next) => {
   }
 
   // 1. Standardize Operational Error Classifications
-  const isOperational = err.isOperational || false;
-  const category = err.category || 'INTERNAL_ERROR';
-  const status = err.status || 500;
+  const isInvalidSort = err.name === 'InvalidSortFieldError';
+  const isOperational = err.isOperational || isInvalidSort || false;
+  const category = err.category || (isInvalidSort ? 'VALIDATION_ERROR' : 'INTERNAL_ERROR');
+  const status = err.statusCode || err.status || (isInvalidSort ? 400 : 500);
   const message = err.message || 'Internal Server Error';
-  const code = err.code || (isOperational ? category : 'INTERNAL_FAILED');
-  const details = err.details || null;
+  const code = err.code || (isInvalidSort ? 'INVALID_SORT_FIELD' : (isOperational ? category : 'INTERNAL_FAILED'));
+  const details = err.details || (isInvalidSort ? { allowedFields: err.allowedFields } : null);
 
   // Centralized DB failure telemetry capture
   const isDbError = err.name && (

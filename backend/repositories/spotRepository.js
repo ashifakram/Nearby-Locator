@@ -104,6 +104,46 @@ export const SpotRepository = {
   },
 
   /**
+   * Retrieve saved spots for a specific user.
+   * Uses offset pagination.
+   */
+  async findSavedSpotsByUserId(userId, limit = 50, offset = 0, trx = db) {
+    try {
+      const safeLimit = Math.min(Math.max(1, limit), 100);
+      const safeOffset = Math.max(0, offset);
+
+      const baseQuery = trx('discovery_saves as ds')
+        .join('spots as s', 'ds.spot_id', 's.id')
+        .where('ds.user_id', userId)
+        .andWhere('s.is_active', true)
+        .andWhere('s.moderation_status', '<>', 'SUSPENDED');
+
+      const countPromise = baseQuery.clone().count('s.id as count').first();
+
+      const dataPromise = baseQuery.clone()
+        .select(
+          's.id', 's.name', 's.category', 's.latitude', 's.longitude',
+          's.rating', 's.address', 's.is_active', 's.moderation_status',
+          'ds.created_at as saved_at'
+        )
+        .orderBy('ds.created_at', 'desc')
+        .limit(safeLimit)
+        .offset(safeOffset);
+
+      const [countResult, data] = await Promise.all([
+        withTransientRetry(() => countPromise),
+        withTransientRetry(() => dataPromise)
+      ]);
+
+      const totalCount = parseInt(countResult?.count || 0, 10);
+
+      return { data, totalCount };
+    } catch (err) {
+      throw handleDbError(err);
+    }
+  },
+
+  /**
    * Perform a robust, performance-optimized, stable nearby search.
    * Supports both simple distance-sorted nearby-search and dynamic explainable CTE composite relevance search.
    */

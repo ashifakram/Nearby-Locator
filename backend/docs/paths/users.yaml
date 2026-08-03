@@ -2,7 +2,9 @@ Profile:
   get:
     operationId: getProfile
     tags: [Users]
-    summary: Retrieve active user profile
+    summary: Retrieve active user profile, preferences, & privacy settings
+    security:
+      - BearerAuth: []
     responses:
       '200':
         description: Profile retrieved successfully
@@ -12,50 +14,198 @@ Profile:
               $ref: '../components/schemas.yaml#/StandardSuccess'
       '401':
         $ref: '../components/responses.yaml#/Unauthorized'
+  put:
+    operationId: updateProfile
+    tags: [Users]
+    summary: Update user profile settings
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Profile updated successfully
+  patch:
+    operationId: patchProfile
+    tags: [Users]
+    summary: Partial update of user profile
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Profile updated successfully
+
+Avatar:
+  post:
+    operationId: uploadAvatar
+    tags: [Users]
+    summary: Upload user profile avatar image
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Avatar uploaded successfully
+  delete:
+    operationId: deleteAvatar
+    tags: [Users]
+    summary: Delete custom user avatar
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Avatar deleted successfully
+
+ChangeEmail:
+  post:
+    operationId: requestEmailChange
+    tags: [Users]
+    summary: Initiate email change verification
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Verification OTP dispatched to new email
+
+VerifyEmailChange:
+  post:
+    operationId: verifyEmailChange
+    tags: [Users]
+    summary: Confirm email change with OTP
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Email changed successfully
+
+Preferences:
+  get:
+    operationId: getPreferences
+    tags: [Users]
+    summary: Get user preferences
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Preferences retrieved
+  put:
+    operationId: updatePreferences
+    tags: [Users]
+    summary: Update user preferences
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Preferences updated
+
+Privacy:
+  get:
+    operationId: getPrivacy
+    tags: [Users]
+    summary: Get user privacy settings
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Privacy settings retrieved
+  put:
+    operationId: updatePrivacy
+    tags: [Users]
+    summary: Update user privacy settings
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Privacy settings updated
+
+NotificationSettings:
+  get:
+    operationId: getNotificationSettings
+    tags: [Users]
+    summary: Get user notification preferences
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Notification settings retrieved
+  put:
+    operationId: updateNotificationSettings
+    tags: [Users]
+    summary: Update user notification preferences
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Notification settings updated
+
+ExportAccount:
+  post:
+    operationId: exportAccount
+    tags: [Users]
+    summary: Request asynchronous GDPR/CCPA personal data export
+    security:
+      - BearerAuth: []
+    responses:
+      '202':
+        description: Account export job accepted for background processing
+
+ExportStatus:
+  get:
+    operationId: getExportStatus
+    tags: [Users]
+    summary: Get status of data export request
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Export status retrieved
+
+ExportDownload:
+  get:
+    operationId: downloadExport
+    tags: [Users]
+    summary: Download generated account export JSON archive
+    responses:
+      '200':
+        description: Data export archive JSON file attachment
 
 Devices:
   get:
     operationId: getDevices
     tags: [Users]
     summary: List active devices/sessions for user
+    security:
+      - BearerAuth: []
     responses:
       '200':
         description: Devices retrieved successfully
-        content:
-          application/json:
-            schema:
-              $ref: '../components/schemas.yaml#/StandardSuccess'
-      '401':
-        $ref: '../components/responses.yaml#/Unauthorized'
 
 RevokeDevice:
   delete:
     operationId: revokeDevice
     tags: [Users]
     summary: Revoke a specific active device session
-    parameters:
-      - $ref: '../components/parameters.yaml#/SessionIdParam'
+    security:
+      - BearerAuth: []
     responses:
       '200':
         description: Device revoked successfully
-        content:
-          application/json:
-            schema:
-              $ref: '../components/schemas.yaml#/StandardSuccess'
-      '401':
-        $ref: '../components/responses.yaml#/Unauthorized'
 
 Permissions:
   get:
     operationId: getPermissions
     tags: [Users]
     summary: Hydrate active session permissions
+    security:
+      - BearerAuth: []
     responses:
       '200':
         description: Permissions hydrated successfully
-        content:
-          application/json:
-            schema:
-              $ref: '../components/schemas.yaml#/StandardSuccess'
-      '401':
-        $ref: '../components/responses.yaml#/Unauthorized'
+
+DeleteUser:
+  delete:
+    operationId: deleteUserAccount
+    tags: [Users]
+    summary: Delete user account
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Account deleted successfully

@@ -47,7 +47,23 @@ describe('📊 Analytics, Product Events, & Operational Intelligence Suite', () 
   // Helper: create a base user in DB
   const createUser = async (email = 'analytics@saas.com', role = 'user') => {
     const password_hash = await bcrypt.hash('Password123!', 10);
-    const [user] = await db('users').insert({ email, password_hash, role }).returning('*');
+    const roleNameMap = { 'user': 'User', 'admin': 'Admin', 'super_admin': 'Super Admin' };
+    const targetName = roleNameMap[role] || role;
+    let roleRecord = await db('roles').whereILike('name', targetName).first();
+    if (!roleRecord) {
+      const priority = targetName === 'Super Admin' ? 100 : (targetName === 'Admin' ? 50 : 10);
+      const [newRole] = await db('roles').insert({ name: targetName, description: targetName, is_system: true, priority }).returning('*');
+      roleRecord = newRole;
+    }
+    if (targetName === 'Admin' || targetName === 'Super Admin') {
+      const allPerms = await db('permissions').select('id');
+      if (allPerms.length > 0) {
+        const inserts = allPerms.map(p => ({ role_id: roleRecord.id, permission_id: p.id }));
+        await db('role_permissions').insert(inserts).onConflict(['role_id', 'permission_id']).ignore();
+      }
+    }
+    const [user] = await db('users').insert({ email, password_hash }).returning('*');
+    await db('user_roles').insert({ user_id: user.id, role_id: roleRecord.id });
     return user;
   };
 
@@ -170,12 +186,8 @@ describe('📊 Analytics, Product Events, & Operational Intelligence Suite', () 
   // TEST 6: ingestAnalyticsEvent writes clean rows to analytics_events table
   // ---------------------------------------------------------------------------
   it('6. ingestAnalyticsEvent writes redacted event rows to the database correctly', async () => {
-    const userId = crypto.randomUUID();
-    await db('users').insert({
-      id: userId,
-      email: 'ingest_test@saas.com',
-      password_hash: 'hash',
-    });
+    const user = await createUser('ingest_test@saas.com', 'user');
+    const userId = user.id;
 
     await ingestAnalyticsEvent({
       eventType:     'PRODUCT',
@@ -209,10 +221,21 @@ describe('📊 Analytics, Product Events, & Operational Intelligence Suite', () 
     const now = new Date();
 
     // Seed two users
+    let defaultRole = await db('roles').whereILike('name', 'User').first();
+    if (!defaultRole) {
+      const [r] = await db('roles').insert({ name: 'User', description: 'User', is_system: true, priority: 10 }).returning('*');
+      defaultRole = r;
+    }
     await db('users').insert([
       { id: userId1, email: 'u1@saas.com', password_hash: 'h1' },
       { id: userId2, email: 'u2@saas.com', password_hash: 'h2' },
     ]);
+    if (defaultRole) {
+      await db('user_roles').insert([
+        { user_id: userId1, role_id: defaultRole.id },
+        { user_id: userId2, role_id: defaultRole.id }
+      ]);
+    }
 
     // Seed today's raw events
     await db('analytics_events').insert([

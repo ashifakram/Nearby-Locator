@@ -22,6 +22,11 @@ const mapDomainErrorToStatus = (code) => {
     case 'TOKEN_INVALID':
     case 'TOKEN_EXPIRED':
     case 'TOKEN_CONSUMED':
+    case 'OTP_INVALID':
+    case 'OTP_EXPIRED':
+    case 'OTP_CONSUMED':
+    case 'GRANT_TOKEN_INVALID':
+    case 'GRANT_TOKEN_EXPIRED':
       return 400;
     case 'NO_TOKEN':
     case 'INVALID_SESSION':
@@ -42,7 +47,11 @@ const mapDomainErrorToStatus = (code) => {
     case 'ALREADY_VERIFIED':
       return 409;
     case 'THROTTLED':
+    case 'OTP_THROTTLED':
+    case 'OTP_MAX_ATTEMPTS_EXCEEDED':
       return 429;
+    case 'ACCOUNT_NOT_VERIFIED':
+      return 403;
     default:
       return 500;
   }
@@ -67,17 +76,6 @@ const clearRefreshTokenCookie = (res) => {
   });
 };
 
-// Hashing helper (SHA-256 for secure tokens) - kept for legacy google route
-const sha256 = (token) => crypto.createHash('sha256').update(token).digest('hex');
-
-// PII-Free Minimal claims Access JWT generator - kept for legacy google route
-const generateAccessToken = (user, sessionId) => {
-  const payload = { sub: user.id, sid: sessionId };
-  return jwt.sign(payload, config.auth.jwtSecret, { expiresIn: '15m' });
-};
-
-// --- MIGRATED ROUTES ---
-
 export const signup = async (req, res, next) => {
   try {
     const { email, password, name } = req.body;
@@ -89,8 +87,7 @@ export const signup = async (req, res, next) => {
       return sendError(res, result.error, result.error.message, status);
     }
 
-    // 201 Created. User is PENDING_VERIFICATION. No tokens issued.
-    return sendSuccess(res, { user: result.data.user }, 'Registration successful. Please verify your email.', 201);
+    return sendSuccess(res, { user: result.data.user }, 'Registration successful. Please verify your email using the 6-digit OTP sent to your email.', 201);
   } catch (err) {
     next(err);
   }
@@ -121,7 +118,6 @@ export const refresh = async (req, res, next) => {
 
     const result = await AuthenticationService.refreshToken(rawRefreshToken, metadata);
     if (!result.success) {
-      // If compromised or invalid, we must clear the cookie
       clearRefreshTokenCookie(res);
       const status = mapDomainErrorToStatus(result.error.code);
       return sendError(res, result.error, result.error.message, status);
@@ -183,7 +179,24 @@ export const requestPasswordReset = async (req, res, next) => {
       return sendError(res, result.error, result.error.message, status);
     }
 
-    return sendSuccess(res, null, 'If the email exists, a password reset link has been sent.', 200);
+    return sendSuccess(res, null, 'If the account exists, a 6-digit password reset OTP has been sent.', 200);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const verifyPasswordResetOtp = async (req, res, next) => {
+  try {
+    const { email, otpCode } = req.body;
+    const metadata = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+
+    const result = await AuthenticationService.verifyPasswordResetOtp(email, otpCode, metadata);
+    if (!result.success) {
+      const status = mapDomainErrorToStatus(result.error.code);
+      return sendError(res, result.error, result.error.message, status);
+    }
+
+    return sendSuccess(res, { resetGrantToken: result.resetGrantToken, expiresAt: result.expiresAt }, 'Reset OTP verified. Use grant token to set new password.', 200);
   } catch (err) {
     next(err);
   }
@@ -191,16 +204,22 @@ export const requestPasswordReset = async (req, res, next) => {
 
 export const resetPassword = async (req, res, next) => {
   try {
-    const { token, newPassword } = req.body;
+    const { email, resetGrantToken, token, newPassword } = req.body;
     const metadata = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
 
-    const result = await AuthenticationService.resetPassword(token, newPassword, metadata);
+    let result;
+    if (resetGrantToken && email) {
+      result = await AuthenticationService.resetPasswordWithGrantToken(email, resetGrantToken, newPassword, metadata);
+    } else {
+      result = await AuthenticationService.resetPassword(token, newPassword, metadata);
+    }
+
     if (!result.success) {
       const status = mapDomainErrorToStatus(result.error.code);
       return sendError(res, result.error, result.error.message, status);
     }
 
-    return sendSuccess(res, null, 'Password has been successfully reset. Please log in.', 200);
+    return sendSuccess(res, null, 'Password has been successfully reset. All active sessions have been revoked. Please log in.', 200);
   } catch (err) {
     next(err);
   }
@@ -227,13 +246,15 @@ export const changePassword = async (req, res, next) => {
 
 export const verifyEmail = async (req, res, next) => {
   try {
-    const { token } = req.body;
-    if (!token) {
-      return sendError(res, { code: 'INVALID_INPUT' }, 'Verification token is required', 400);
+    const { token, otpCode, email } = req.body;
+    const codeOrToken = otpCode || token;
+
+    if (!codeOrToken) {
+      return sendError(res, { code: 'INVALID_INPUT' }, 'Verification code or token is required', 400);
     }
 
     const metadata = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
-    const result = await AuthenticationService.verifyEmail(token, metadata);
+    const result = await AuthenticationService.verifyEmail(codeOrToken, email, metadata);
 
     if (!result.success) {
       const status = mapDomainErrorToStatus(result.error.code);
@@ -265,24 +286,25 @@ export const resendVerification = async (req, res, next) => {
       return sendError(res, result.error, result.error.message, status);
     }
 
-    return sendSuccess(res, null, 'If the account exists and is not verified, a new verification link has been sent.', 200);
+    return sendSuccess(res, null, 'If the account exists and is not verified, a new verification OTP has been sent.', 200);
   } catch (err) {
     next(err);
   }
 };
 
-// --- LEGACY ROUTES (Deferred to OAuth Phase) ---
+// --- OAUTH HELPERS ---
 
-// Google OAuth verification – delegates to provider-agnostic AuthenticationService
 export const googleUpsert = async (req, res, next) => {
   try {
-    const { tokenId } = req.body;
-    if (!tokenId) {
-      return sendError(res, { code: 'INVALID_INPUT' }, 'Google tokenId is required', 400);
+    const { tokenId, code } = req.body;
+
+    if (!tokenId && !code) {
+      return sendError(res, { code: 'INVALID_INPUT' }, 'Either Google tokenId or authorization code is required', 400);
     }
 
     const provider = ProviderFactory.get('google');
-    const normalizedProfile = await provider.verifyAndNormalize(tokenId);
+    // verifyAndNormalize accepts either an ID token or an auth code
+    const normalizedProfile = await provider.verifyAndNormalize(tokenId || code, !!code);
 
     const metadata = {
       ipAddress: req.ip,
@@ -310,7 +332,6 @@ export const googleUpsert = async (req, res, next) => {
   }
 };
 
-// Provider-agnostic unlinking
 export const unlinkProvider = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -320,13 +341,10 @@ export const unlinkProvider = async (req, res, next) => {
       return sendError(res, { code: 'INVALID_INPUT' }, 'Provider name is required', 400);
     }
 
-    // Attempt remote revocation if the provider supports it
     try {
       const provider = ProviderFactory.get(providerName);
-      await provider.revoke(userId); // In a real app, you'd pass the specific account ID or token
-    } catch (e) {
-      // Ignore unsupported providers or remote revocation failures during unlink
-    }
+      await provider.revoke(userId);
+    } catch (e) {}
 
     await AuthenticationService.unlinkOAuth(userId, providerName);
     return sendSuccess(res, null, `${providerName} account unlinked`, 200);

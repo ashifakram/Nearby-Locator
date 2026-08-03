@@ -1,0 +1,16 @@
+<h1>Critical Security Alert</h1>
+<p>Hello {{userName}},</p>
+<p>We detected security activity on your {{companyName}} account that requires your attention: <strong>{{alertTitle}}</strong></p>
+
+<p>{{description}}</p>
+
+<div class="activity-card">
+  <div class="activity-row"><span class="activity-label">Detected At:</span><span class="activity-val">{{timestamp}}</span></div>
+  <div class="activity-row"><span class="activity-label">Event Type:</span><span class="activity-val">{{eventType}}</span></div>
+  <div class="activity-row"><span class="activity-label">IP Address:</span><span class="activity-val">{{ipAddress}}</span></div>
+  <div class="activity-row"><span class="activity-label">Location:</span><span class="activity-val">{{location}}</span></div>
+</div>
+
+<div class="security-notice">
+  <strong>Recommended Action:</strong> Please sign in to your security settings, review active sessions, and reset your password to ensure your account remains safe.
+</div>

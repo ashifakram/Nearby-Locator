@@ -19,11 +19,28 @@ export const validateTestEnvironment = () => {
 };
 
 // PostgreSQL-Native Cascading Truncation and Sequence Resets for Test Isolation
+export const seedDefaultRoles = async () => {
+  const rolesToInsert = [
+    { name: 'user', description: 'Standard User', is_system: true, priority: 10 },
+    { name: 'admin', description: 'System Administrator', is_system: true, priority: 100 },
+    { name: 'moderator', description: 'Content Moderator', is_system: true, priority: 50 }
+  ];
+  for (const role of rolesToInsert) {
+    const exists = await db('roles').where({ name: role.name }).first();
+    if (!exists) {
+      await db('roles').insert(role);
+    }
+  }
+};
+
 export const cleanDatabase = async () => {
   validateTestEnvironment();
   
   // Natively truncate all active tables using PostgreSQL CASCADE to clear dependent foreign keys
   await db.raw('TRUNCATE TABLE search_synonyms, search_terms, search_suggestions, spot_moderation_history, moderation_appeals, reports, discovery_saves, discovery_clicks, discovery_searches, dead_letter_jobs, webhook_deliveries, webhook_subscriptions, notification_deliveries, suppression_list, user_notification_preferences, spots, audit_logs, moderation_history, analytics_events, daily_analytics_rollups, user_sessions, login_attempts, system_errors, users CASCADE;');
+
+  // Re-seed essential system roles for RBAC FK references
+  await seedDefaultRoles();
 };
 
 import { clearGeoRateLimiterCache } from '../middleware/geoRateLimiter.js';

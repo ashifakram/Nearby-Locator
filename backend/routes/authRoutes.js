@@ -7,6 +7,7 @@ import {
   logoutAll, 
   getSessions, 
   requestPasswordReset, 
+  verifyPasswordResetOtp,
   resetPassword, 
   changePassword,
   googleUpsert, 
@@ -40,14 +41,15 @@ const csrfHeaderGuard = (req, res, next) => {
 router.post('/signup', ipRateLimiter(60, 60, 'signup'), signup);
 router.post('/login', ipRateLimiter(60, 60, 'login'), checkAccountLockout, login);
 router.post('/google', ipRateLimiter(60, 60, 'google'), googleUpsert);
-router.post('/verify-email', ipRateLimiter(5, 60, 'verifyEmail'), verifyEmail);
-router.post('/resend-verification', ipRateLimiter(3, 60, 'resendVerification'), resendVerification);
+router.post('/verify-email', ipRateLimiter(10, 60, 'verifyEmail'), verifyEmail);
+router.post('/resend-verification', ipRateLimiter(5, 60, 'resendVerification'), resendVerification);
 
 // Token Rotation & CSRF Protected Rotator (strictly accepts secure cookies only)
 router.post('/refresh', ipRateLimiter(120, 60, 'refresh'), csrfHeaderGuard, refresh);
 
 // Password Reset Routes (with sliding-window throttling protection)
 router.post('/password/reset-request', ipRateLimiter(5, 60, 'resetReq'), requestPasswordReset);
+router.post('/password/verify-otp', ipRateLimiter(10, 60, 'verifyResetOtp'), verifyPasswordResetOtp);
 router.post('/password/reset', ipRateLimiter(10, 60, 'reset'), resetPassword);
 router.post('/password/change', authJwt, csrfHeaderGuard, changePassword);
 

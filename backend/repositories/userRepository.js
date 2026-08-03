@@ -47,8 +47,14 @@ export const UserRepository = {
       return await withTransientRetry(() => 
         executor.transaction(async (innerTrx) => {
           const [newUser] = await innerTrx('users')
-            .insert({ email, password_hash, name, role_id, provider: 'local' })
-            .returning(['id', 'email', 'name', 'provider', 'role_id']);
+            .insert({ email, password_hash, name, provider: 'local' })
+            .returning(['id', 'email', 'name', 'provider']);
+          
+          if (role_id) {
+            await innerTrx('user_roles').insert({ user_id: newUser.id, role_id });
+            newUser.role_id = role_id; // For legacy compatibility with returns
+          }
+          
           return newUser;
         })
       );
@@ -56,6 +62,29 @@ export const UserRepository = {
       throw handleDbError(err);
     }
   },
+
+  async updateProfile(id, { name, avatar_url, timezone }, executor = db) {
+    try {
+      return await withTransientRetry(async () => {
+        const payload = { updated_at: executor.fn.now(), updated_by: id };
+        
+        if (name !== undefined) payload.name = name;
+        if (avatar_url !== undefined) payload.avatar_url = avatar_url;
+        if (timezone !== undefined) payload.timezone = timezone;
+
+        const [updatedUser] = await executor('users')
+          .where({ id })
+          .update(payload)
+          .returning('*');
+          
+        return updatedUser;
+      });
+    } catch (err) {
+      throw handleDbError(err);
+    }
+  },
+
+
 
 
   async hardDeleteUser(userId, email, executor = db) {
@@ -168,12 +197,22 @@ export const UserRepository = {
    */
   async createUser(userData, executor = db) {
     try {
-      return await withTransientRetry(async () => {
-        const [user] = await executor('users')
-          .insert(userData)
-          .returning('*');
-        return user;
-      });
+      return await withTransientRetry(() =>
+        executor.transaction(async (innerTrx) => {
+          // Extract role_id to prevent it from going into 'users' insert
+          const { role_id, ...userFields } = userData;
+
+          const [user] = await innerTrx('users')
+            .insert(userFields)
+            .returning('*');
+
+          if (role_id) {
+            await innerTrx('user_roles').insert({ user_id: user.id, role_id });
+            user.role_id = role_id; // For legacy compatibility with returns
+          }
+          return user;
+        })
+      );
     } catch (err) {
       throw handleDbError(err);
     }
@@ -330,5 +369,51 @@ export const UserRepository = {
     } catch (err) {
       throw handleDbError(err);
     }
+  },
+
+  /**
+   * Soft deletes a user account by setting status to SOFT_DELETED.
+   */
+  async softDeleteUser(userId, executor = db) {
+    try {
+      return await withTransientRetry(() =>
+        executor('users')
+          .where({ id: userId })
+          .update({ status: 'SOFT_DELETED', updated_at: executor.fn.now() })
+      );
+    } catch (err) {
+      throw handleDbError(err);
+    }
+  },
+
+  /**
+   * Restores a soft-deleted user account by setting status to ACTIVE.
+   */
+  async restoreUser(userId, executor = db) {
+    try {
+      return await withTransientRetry(() =>
+        executor('users')
+          .where({ id: userId })
+          .update({ status: 'ACTIVE', updated_at: executor.fn.now() })
+      );
+    } catch (err) {
+      throw handleDbError(err);
+    }
+  },
+
+  /**
+   * Updates user email address.
+   */
+  async updateEmail(userId, newEmail, executor = db) {
+    try {
+      return await withTransientRetry(() =>
+        executor('users')
+          .where({ id: userId })
+          .update({ email: newEmail.toLowerCase().trim(), updated_at: executor.fn.now() })
+      );
+    } catch (err) {
+      throw handleDbError(err);
+    }
   }
 };
+

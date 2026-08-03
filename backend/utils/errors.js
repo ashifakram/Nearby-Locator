@@ -17,10 +17,30 @@ export class AuthError extends AppError {
   }
 }
 
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Unauthorized access', details = {}) {
+    super('UNAUTHORIZED', message, 401, details);
+  }
+}
+
 // 400 Client Request Schema & Input Parameter Errors
 export class ValidationError extends AppError {
   constructor(message = 'Validation mismatch', details = {}) {
     super('VALIDATION_ERROR', message, 400, details);
+  }
+}
+
+// 404 Resource Not Found
+export class NotFoundError extends AppError {
+  constructor(message = 'Resource not found', details = {}) {
+    super('NOT_FOUND', message, 404, details);
+  }
+}
+
+// 409 Conflict Error
+export class ConflictError extends AppError {
+  constructor(message = 'Resource conflict', details = {}) {
+    super('CONFLICT', message, 409, details);
   }
 }
 

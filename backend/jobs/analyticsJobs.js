@@ -14,8 +14,23 @@ export const ALLOWED_EVENTS = new Set([
   // PRODUCT events
   'user_registered',
   'search_executed',
+  'search_started',
+  'search_completed',
+  'search_zero_results',
+  'search_failed',
+  'ai_search',
+  'ai_provider_fallback',
+  'ai_timeout',
+  'ai_provider_error',
+  'cache_hit',
+  'cache_miss',
+  'place_opened',
+  'place_saved',
   'place_details_viewed',
   'favorites_toggled',
+  'collection_created',
+  'collection_updated',
+  'collection_shared',
   // SECURITY events
   'replay_attack_intercepted',
   'rate_limit_tripped',
@@ -24,23 +39,36 @@ export const ALLOWED_EVENTS = new Set([
 ]);
 
 // Sampling rates for high-volume events (prevents Redis/Postgres queue pressure).
-// e.g. search_executed is sampled at 10 % in high-traffic environments.
 const SAMPLING_RATES = {
-  search_executed: 0.10,   // 10 % sample
-  place_details_viewed: 0.50, // 50 % sample
+  search_executed: 0.10,
+  place_details_viewed: 0.50,
 };
 
 // Payload key allowlist for each event (data minimisation).
-// Only whitelisted keys survive redaction before persistence.
 const PAYLOAD_ALLOWLIST = {
-  user_registered:             ['method'],          // 'email' | 'google'
-  search_executed:             ['category'],        // place category string only
-  place_details_viewed:        ['category'],
-  favorites_toggled:           ['action'],          // 'add' | 'remove'
+  user_registered:             ['method'],
+  search_executed:             ['category', 'query', 'result_count', 'latency_ms', 'cache_status'],
+  search_started:              ['query', 'category', 'provider'],
+  search_completed:            ['query', 'category', 'result_count', 'latency_ms'],
+  search_zero_results:         ['query', 'category'],
+  search_failed:               ['query', 'reason'],
+  ai_search:                   ['query', 'model', 'provider', 'latency_ms', 'result_count'],
+  ai_provider_fallback:        ['from_provider', 'to_provider', 'reason'],
+  ai_timeout:                  ['provider', 'model', 'timeout_ms'],
+  ai_provider_error:           ['provider', 'error_code'],
+  cache_hit:                   ['cache_key', 'ttl'],
+  cache_miss:                  ['cache_key'],
+  place_opened:                ['place_id', 'category'],
+  place_saved:                 ['place_id', 'action'],
+  place_details_viewed:        ['category', 'place_id'],
+  favorites_toggled:           ['action', 'place_id'],
+  collection_created:          ['collection_id', 'title'],
+  collection_updated:          ['collection_id', 'item_count'],
+  collection_shared:           ['collection_id', 'platform'],
   replay_attack_intercepted:   ['session_family_id'],
   rate_limit_tripped:          ['endpoint', 'bucket'],
   suspicious_login_blocked:    ['failure_count'],
-  automation_pattern_flagged:  ['signal'],          // short descriptor string
+  automation_pattern_flagged:  ['signal'],
 };
 
 // Sensitive key names that must never survive into analytics storage

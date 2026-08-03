@@ -1,0 +1,63 @@
+
+Search:
+  get:
+    operationId: searchDiscovery
+    tags: [Discovery]
+    summary: Search places
+    responses:
+      '200':
+        description: Success
+
+Click:
+  post:
+    operationId: logClick
+    tags: [Discovery]
+    summary: Log click event
+    responses:
+      '200':
+        description: Success
+
+Save:
+  post:
+    operationId: savePlace
+    tags: [Discovery]
+    summary: Save a place
+    responses:
+      '200':
+        description: Success
+
+Saves:
+  get:
+    operationId: getSavedPlaces
+    tags: [Discovery]
+    summary: Get saved places
+    responses:
+      '200':
+        description: Success
+
+History:
+  get:
+    operationId: getHistory
+    tags: [Discovery]
+    summary: Get history
+    responses:
+      '200':
+        description: Success
+
+Telemetry:
+  get:
+    operationId: getTelemetry
+    tags: [Discovery]
+    summary: Get telemetry
+    responses:
+      '200':
+        description: Success
+
+Autocomplete:
+  get:
+    operationId: autocomplete
+    tags: [Discovery]
+    summary: Autocomplete search
+    responses:
+      '200':
+        description: Success

@@ -97,25 +97,29 @@ export class Worker {
   async start() {
     logger.info(`Worker starting with concurrency limit: ${this.concurrency}`);
     
-    // Dedicated blocking Redis client connection to keep blocking queries isolated
-    this.blockingClient = createClient({
-      url: config.redis.url,
-      socket: {
-        tls: config.redis.tls,
-        rejectUnauthorized: false
-      }
-    });
+    if (process.env.MOCK_REDIS === 'true') {
+      this.blockingClient = client;
+    } else {
+      // Dedicated blocking Redis client connection to keep blocking queries isolated
+      this.blockingClient = createClient({
+        url: config.redis.url,
+        socket: {
+          tls: config.redis.tls,
+          rejectUnauthorized: false
+        }
+      });
 
-    this.blockingClient.on('error', (err) => {
-      if (err.code === 'ECONNRESET') {
-        logger.warn('WORKER_REDIS_RECONNECT', 'Worker dedicated Redis client connection reset, reconnecting...');
-      } else {
-        logger.error('WORKER_REDIS_ERROR', 'Worker dedicated Redis client error:', err);
-      }
-    });
+      this.blockingClient.on('error', (err) => {
+        if (err.code === 'ECONNRESET') {
+          logger.warn('WORKER_REDIS_RECONNECT', 'Worker dedicated Redis client connection reset, reconnecting...');
+        } else {
+          logger.error('WORKER_REDIS_ERROR', 'Worker dedicated Redis client error:', err);
+        }
+      });
 
-    await this.blockingClient.connect();
-    logger.info('Worker dedicated Redis client connected successfully.');
+      await this.blockingClient.connect();
+      logger.info('Worker dedicated Redis client connected successfully.');
+    }
 
     // Start blocking poll loop asynchronously
     this.loop();

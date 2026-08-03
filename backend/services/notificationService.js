@@ -1,115 +1,110 @@
-import crypto from 'crypto';
-import db from '../db.js';
-import { enqueue } from '../utils/queue.js';
+import { EmailService } from './emailService.js';
+import { EmailTemplateEngine } from './emailTemplateEngine.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * NotificationService (Domain Notification Orchestrator)
+ * Exposes a pure domain-level notification interface across all SaaS email types.
+ * Zero direct dependency on Nodemailer, Handlebars, or SMTP providers.
+ */
 export const NotificationService = {
   /**
-   * Main Dispatch Orchestrator. Checks suppressions, verifies user preferences, 
-   * evaluates timezone-aware quiet hours, compiles delivery keys, and enqueues jobs.
+   * Dispatches a domain notification email to a recipient.
+   * @param {string} recipientEmail - Recipient email address
+   * @param {string} notificationType - High-level notification event type
+   * @param {Object} payload - Notification variables and metadata
+   * @returns {Promise<{ success: boolean, id?: string }>}
    */
-  async sendNotification({ userId = null, channel, category, target, templateId, version = 'v1', payload = {}, idempotencyToken = null }, trx = db) {
-    try {
-      const parsedTarget = target.trim();
-      
-      // 1. Check Suppression List (Halt dispatches to permanently failed/bounced targets)
-      const isSuppressed = await trx('suppression_list').where({ target_value: parsedTarget }).first();
-      if (isSuppressed) {
-        logger.warn('DELIVERY_SUPPRESSED', `Dispatch blocked due to suppression list match: ${parsedTarget}`, { reason: isSuppressed.reason });
-        return { status: 'suppressed', reason: isSuppressed.reason };
-      }
+  async notifyUser(recipientEmail, notificationType, payload = {}) {
+    logger.info(`[NotificationService] Processing domain notification '${notificationType}' for ${recipientEmail}`);
 
-      let userTimezone = 'America/New_York'; // Default fallback timezone
+    const userName = payload.userName || recipientEmail.split('@')[0];
+    const defaultMeta = {
+      userName,
+      timestamp: payload.timestamp || new Date().toISOString(),
+      browser: payload.browser || payload.userAgent || 'Unknown Browser',
+      os: payload.os || 'Unknown OS',
+      location: payload.location || 'Unknown Location',
+      ipAddress: payload.ipAddress || '127.0.0.1',
+      ...payload
+    };
 
-      // 2. Evaluate User Preference Channel & Category settings if userId present
-      if (userId) {
-        const user = await trx('users').where({ id: userId }).first();
-        if (!user) {
-          throw new Error(`User with ID ${userId} does not exist.`);
-        }
-        
-        userTimezone = user.timezone || 'America/New_York';
+    let templateName = 'test';
+    let subject = 'System Notification';
 
-        // Check explicit channel preference overrides
-        const preference = await trx('user_notification_preferences')
-          .where({ user_id: userId, channel, category })
-          .first();
-
-        if (preference && !preference.is_enabled) {
-          logger.info(`Notification blocked due to user preference opt-out: User ${userId}, Channel ${channel}, Category ${category}`);
-          return { status: 'opted_out' };
-        }
-      }
-
-      // 3. Compile event-specific idempotency delivery_key
-      // If caller omits the idempotency token, assign a request-scoped UUID (no raw time bucket collapsing)
-      const safeIdempotencyToken = idempotencyToken || crypto.randomUUID();
-      const deliveryKey = crypto.createHash('sha256')
-        .update(`${parsedTarget}:${channel}:${templateId}:${safeIdempotencyToken}`)
-        .digest('hex');
-
-      // 4. Timezone-Aware Quiet Hours Calculation (10 PM to 7 AM local time)
-      let delayMs = 0;
-      const isNonEssential = category === 'marketing';
-      
-      if (isNonEssential) {
-        try {
-          const formatterObj = new Intl.DateTimeFormat('en-US', {
-            timeZone: userTimezone,
-            year: 'numeric',
-            month: 'numeric',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: 'numeric',
-            second: 'numeric',
-            hour12: false
-          });
-          const parts = formatterObj.formatToParts(new Date());
-          const getPart = (type) => parseInt(parts.find(p => p.type === type).value, 10);
-
-          const hour = getPart('hour');
-
-          // Is quiet hours active? (10 PM to 7 AM)
-          if (hour >= 22 || hour < 7) {
-            // Target date representing 8 AM in user local scale
-            const targetDate = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
-            if (hour >= 22) {
-              targetDate.setDate(targetDate.getDate() + 1);
-            }
-            targetDate.setHours(8, 0, 0, 0);
-
-            const nowLocal = new Date(new Date().toLocaleString('en-US', { timeZone: userTimezone }));
-            const diffMs = targetDate.getTime() - nowLocal.getTime();
-            delayMs = Math.max(1000, diffMs);
-
-            logger.info(`Quiet period active (${hour} PM/AM) in user timezone (${userTimezone}). Delaying marketing dispatch by ${delayMs}ms.`, { userId });
-          }
-        } catch (tzErr) {
-          logger.warn('TIMEZONE_CALCULATION_FAILED', 'Failed to calculate user localized quiet period. Defaulting to instant delivery.', tzErr);
-        }
-      }
-
-      // 5. Enqueue background delivery job dynamically
-      const jobId = await enqueue('SEND_NOTIFICATION', {
-        userId,
-        channel,
-        category,
-        target: parsedTarget,
-        templateId,
-        version,
-        payload,
-        deliveryKey
-      }, {
-        id: crypto.randomUUID(),
-        delayMs,
-        priority: category === 'marketing' ? 'low' : 'high'
-      });
-
-      return { status: 'enqueued', jobId, deliveryKey };
-
-    } catch (err) {
-      logger.error('NOTIFICATION_SERVICE_ERROR', 'Failed to orchestrate notification send:', err);
-      throw err;
+    switch (notificationType) {
+      case 'VERIFY_EMAIL':
+        templateName = 'verify_email';
+        subject = 'Verify your email address';
+        break;
+      case 'WELCOME':
+        templateName = 'welcome';
+        subject = `Welcome to ${process.env.COMPANY_NAME || 'Nearby Locator'}!`;
+        break;
+      case 'RESEND_VERIFICATION':
+        templateName = 'resend_verification';
+        subject = 'Your new verification code';
+        break;
+      case 'FORGOT_PASSWORD':
+        templateName = 'password_reset_request';
+        subject = 'Password reset request';
+        break;
+      case 'PASSWORD_CHANGED':
+        templateName = 'password_changed';
+        subject = 'Your password was changed';
+        break;
+      case 'LOGIN_ALERT':
+        templateName = 'login_alert';
+        subject = 'New login detected';
+        break;
+      case 'ACCOUNT_LOCKED':
+        templateName = 'account_locked';
+        subject = 'Account temporarily locked';
+        break;
+      case 'ACCOUNT_REACTIVATED':
+        templateName = 'account_reactivated';
+        subject = 'Your account has been reactivated';
+        break;
+      case 'EMAIL_CHANGED':
+        templateName = 'email_changed';
+        subject = 'Your email address was changed';
+        break;
+      case 'SECURITY_ALERT':
+        templateName = 'security_alert';
+        subject = `Security Alert: ${payload.alertTitle || 'Critical Event Detected'}`;
+        break;
+      case 'ACCOUNT_DELETED':
+        templateName = 'account_deleted';
+        subject = 'Account deletion confirmation';
+        break;
+      case 'ADMIN_INVITATION':
+        templateName = 'admin_invitation';
+        subject = `You've been invited to join ${process.env.COMPANY_NAME || 'Nearby Locator'}`;
+        break;
+      case 'TEST_NOTIFICATION':
+        templateName = 'test';
+        subject = 'Infrastructure Test Notification';
+        break;
+      default:
+        templateName = 'test';
+        subject = payload.subject || 'System Notification';
+        break;
     }
+
+    const html = EmailTemplateEngine.render(templateName, {
+      ...defaultMeta,
+      subject
+    });
+
+    const result = await EmailService.sendEmail({
+      to: recipientEmail,
+      subject,
+      html,
+      text: payload.message || `${subject} for ${recipientEmail}`,
+      type: notificationType.toLowerCase(),
+      otpCode: payload.otpCode
+    });
+
+    return { success: result.success, id: result.messageId };
   }
 };

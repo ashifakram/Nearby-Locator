@@ -14,7 +14,7 @@ router.put('/preferences', authJwt, NotificationController.updatePreferences);
 router.post('/test', authJwt, NotificationController.testSend);
 
 // Create webhook subscriptions
-router.post('/webhooks/subscriptions', authJwt, NotificationController.createWebhook);
+router.post('/webhooks/subscriptions', authJwt, requirePermission('admin.access'), NotificationController.createWebhook);
 
 // Inbound carrier bounce/suppression ingestion webhook (public, called by SendGrid/Twilio APIs)
 router.post('/providers/webhooks', NotificationController.inboundProviderWebhook);

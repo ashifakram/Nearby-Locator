@@ -10,7 +10,7 @@ let config;
 try {
   const configModule = await import('./config/index.js');
   config = configModule.default;
-  
+
   if (config.app.env === 'production') {
     console.log(`\n🩺 [Config Diagnostics] Initialized: ENV=${config.app.env} | PORT=${config.app.port} | HOST=${config.app.host} | DB=Configured | Redis=Configured | Services=Active`);
   } else if (config.app.env !== 'test') {
@@ -31,9 +31,13 @@ try {
 }
 
 
+import { correlationIdMiddleware } from './middleware/correlationId.js';
+
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json());
+app.use(correlationIdMiddleware);
+app.use(express.json({ limit: '10mb' }));
+app.use('/uploads', express.static('uploads'));
 
 // Native zero-dependency lightweight HTTP-only cookie parser middleware
 app.use((req, res, next) => {
@@ -57,16 +61,23 @@ app.use(responseFormatter);
 import { requestObservability } from './middleware/observability.js';
 app.use(requestObservability);
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',') 
-  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:5000',
+      'http://127.0.0.1:5000',
+    ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin))) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
   credentials: true
@@ -130,7 +141,7 @@ swaggerDocument.servers = [
   { url: config.app.apiUrl || `http://localhost:${config.app.port}/api`, description: 'Current Environment Server' }
 ];
 
-const docsMiddleware = config.app.env === 'production' 
+const docsMiddleware = config.app.env === 'production'
   ? [authJwt, requirePermission('docs.read'), swaggerUi.serve, swaggerUi.setup(swaggerDocument)]
   : [swaggerUi.serve, swaggerUi.setup(swaggerDocument)];
 
@@ -140,281 +151,7 @@ app.use('/api-docs/v1', ...docsMiddleware);
 import { errorHandler } from './middleware/errorHandler.js';
 app.use(errorHandler);
 
-// In-memory storage for lists (in production, use a database like Redis or MongoDB)
-const lists = new Map(); // Map<listName, Array<{place_id, name, address, rating, map_url}>>
 
-const categories = {
-    restaurant: "restaurant",
-    hospital: "hospital",
-    medical: "pharmacy",
-    pharmacy: "pharmacy",
-    gas_station: "gas_station",
-    atm: "atm",
-    school: "school",
-    shopping_mall: "shopping_mall",
-    bank: "bank",
-    cafe: "cafe",
-    lodging: "lodging"
-};
-
-app.post("/nearby", async (req, res) => {
-    console.log("\n========================================");
-    console.log("📍 NEW REQUEST RECEIVED");
-    console.log("========================================");
-    console.log("⏰ Timestamp:", new Date().toLocaleString());
-
-    try {
-        const { latitude, longitude, category, radius, keyword, opennow } = req.body;
-
-        console.log("\n📥 Request Body:");
-        console.log("  - Latitude:", latitude);
-        console.log("  - Longitude:", longitude);
-        console.log("  - Category:", category);
-        console.log("  - Radius:", radius, "km");
-        console.log("  - Keyword:", keyword || "none");
-        console.log("  - Open Now:", opennow || false);
-
-        const placeType = categories[category] || "restaurant";
-        console.log("\n🏷️  Mapped Place Type:", placeType);
-
-        console.log("\n🌐 Making API Request to Google Places...");
-        const apiUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json";
-        console.log("  - URL:", apiUrl);
-        console.log("  - Location:", `${latitude},${longitude}`);
-        console.log("  - Radius:", radius * 1000, "meters");
-        console.log("  - Type:", placeType);
-        console.log("  - Keyword:", keyword || "none");
-        console.log("  - Open Now:", opennow || false);
-        console.log("  - API Key:", config.services.googleApiKey ? "✓ Present" : "✗ Missing");
-
-        const response = await axios.get(apiUrl, {
-            params: {
-                location: `${latitude},${longitude}`,
-                radius: radius * 1000,
-                type: placeType,
-                key: config.services.googleApiKey,
-                ...(keyword && { keyword }),
-                ...(opennow && { opennow: true }),
-            },
-        });
-
-        console.log("\n✅ Google API Response Status:", response.data.status);
-        console.log("📊 Total Results Found:", response.data.results?.length || 0);
-
-        // Handle Google API errors (anything other than OK or ZERO_RESULTS)
-        if (response.data.status !== "OK" && response.data.status !== "ZERO_RESULTS") {
-            console.log("⚠️  API Error:", response.data.status);
-            if (response.data.error_message) {
-                console.log("❌ Error Message:", response.data.error_message);
-            }
-            
-            let errorMessage = "";
-            switch (response.data.status) {
-                case "REQUEST_DENIED":
-                    errorMessage = "🔒 Our location service is currently unavailable. We're working to fix this. Please try again later.";
-                    break;
-                case "INVALID_REQUEST":
-                    errorMessage = "😕 Something went wrong with your search. Please try again with a different location or category.";
-                    break;
-                case "OVER_QUERY_LIMIT":
-                    errorMessage = "⏳ We're experiencing high traffic right now. Please wait a moment and try your search again.";
-                    break;
-                case "UNKNOWN_ERROR":
-                    errorMessage = "😕 Something unexpected happened. Please try your search again.";
-                    break;
-                default:
-                    errorMessage = "😕 We're having trouble finding places right now. Please try again in a moment.";
-            }
-            
-            console.log("========================================\n");
-            return res.json({ status: "error", message: errorMessage });
-        }
-
-        // Check if results array exists and has data
-        if (!response.data.results || response.data.results.length === 0) {
-            console.log("\n📭 No results found");
-            console.log("========================================\n");
-            return res.json({ status: "success", results: [] });
-        }
-
-        const results = response.data.results.map((place, index) => {
-            const lat = place.geometry.location.lat;
-            const lng = place.geometry.location.lng;
-
-            console.log(`\n  ${index + 1}. ${place.name}`);
-            console.log(`     📍 ${place.vicinity}`);
-            console.log(`     ⭐ Rating: ${place.rating || "N/A"}`);
-
-            return {
-                name: place.name,
-                address: place.vicinity,
-                rating: place.rating,
-                place_id: place.place_id, // Add place_id for list functionality
-                map_url: `https://www.google.com/maps/dir/?api=1&origin=${latitude},${longitude}&destination=${lat},${lng}`
-            };
-        });
-
-        console.log("\n✅ SUCCESS - Sending", results.length, "results to frontend");
-        console.log("========================================\n");
-
-        res.json({ status: "success", results });
-
-    } catch (error) {
-        console.log("\n❌ ERROR OCCURRED:");
-        console.log("  - Message:", error.message);
-        console.log("  - Stack:", error.stack);
-        
-        if (error.response) {
-            console.log("\n🔴 API Response Error:");
-            console.log("  - Status:", error.response.status);
-            console.log("  - Data:", JSON.stringify(error.response.data, null, 2));
-        }
-        
-        console.log("========================================\n");
-        
-        // Send user-friendly error message
-        res.json({ 
-            status: "error", 
-            message: "😕 We're having trouble connecting to our location service right now. Please try again in a few moments." 
-        });
-    }
-});
-
-// Health check endpoint for Docker
-app.get("/health", (req, res) => {
-  // Use standardized response
-  res.success({ status: "healthy", timestamp: new Date().toISOString() }, "Server healthy", 200);
-});
-
-// Lists endpoints for saving and managing places
-app.get("/lists", (req, res) => {
-    const listNames = Array.from(lists.keys());
-    res.json({ status: "success", lists: listNames });
-});
-
-app.post("/lists", (req, res) => {
-    try {
-        const { listName, place } = req.body;
-
-        if (!listName || !place) {
-            return res.json({
-                status: "error",
-                message: "List name and place are required"
-            });
-        }
-
-        // Initialize list if it doesn't exist
-        if (!lists.has(listName)) {
-            lists.set(listName, []);
-        }
-
-        // Check if place already exists in list (by place_id)
-        const list = lists.get(listName);
-        const exists = list.some(p => p.place_id === place.place_id);
-
-        if (exists) {
-            return res.json({
-                status: "error",
-                message: "This place is already in the list"
-            });
-        }
-
-        // Add place to list
-        list.push({
-            place_id: place.place_id,
-            name: place.name,
-            address: place.address,
-            rating: place.rating,
-            map_url: place.map_url
-        });
-
-        res.json({
-            status: "success",
-            message: `Place added to ${listName}`,
-            list: list
-        });
-    } catch (error) {
-        console.error("Error adding to list:", error);
-        res.json({
-            status: "error",
-            message: "Failed to add place to list"
-        });
-    }
-});
-
-app.get("/lists/:listName", (req, res) => {
-    try {
-        const { listName } = req.params;
-        const list = lists.get(listName) || [];
-        res.json({ status: "success", list });
-    } catch (error) {
-        console.error("Error fetching list:", error);
-        res.json({
-            status: "error",
-            message: "Failed to fetch list"
-        });
-    }
-});
-
-app.delete("/lists/:listName", (req, res) => {
-    try {
-        const { listName } = req.params;
-        if (lists.delete(listName)) {
-            res.json({
-                status: "success",
-                message: `List ${listName} deleted`
-            });
-        } else {
-            res.json({
-                status: "error",
-                message: "List not found"
-            });
-        }
-    } catch (error) {
-        console.error("Error deleting list:", error);
-        res.json({
-            status: "error",
-            message: "Failed to delete list"
-        });
-    }
-});
-
-app.delete("/lists/:listName/place/:placeId", (req, res) => {
-    try {
-        const { listName, placeId } = req.params;
-        const list = lists.get(listName);
-
-        if (!list) {
-            return res.json({
-                status: "error",
-                message: "List not found"
-            });
-        }
-
-        const initialLength = list.length;
-        const filteredList = list.filter(place => place.place_id !== placeId);
-        lists.set(listName, filteredList);
-
-        if (filteredList.length < initialLength) {
-            res.json({
-                status: "success",
-                message: "Place removed from list",
-                list: filteredList
-            });
-        } else {
-            res.json({
-                status: "error",
-                message: "Place not found in list"
-            });
-        }
-    } catch (error) {
-        console.error("Error removing place from list:", error);
-        res.json({
-            status: "error",
-            message: "Failed to remove place from list"
-        });
-    }
-});
 
 if (config.app.env !== 'test' && process.env.NO_LISTEN !== 'true') {
   let activeWorker = null;

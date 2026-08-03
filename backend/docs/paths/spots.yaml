@@ -1,0 +1,27 @@
+
+CreateSpot:
+  post:
+    operationId: createSpot
+    tags: [Spots]
+    summary: Create a spot
+    responses:
+      '200':
+        description: Success
+
+SearchSpots:
+  get:
+    operationId: searchSpots
+    tags: [Spots]
+    summary: Search spots
+    responses:
+      '200':
+        description: Success
+
+Clusters:
+  get:
+    operationId: getClusters
+    tags: [Spots]
+    summary: Get spot clusters
+    responses:
+      '200':
+        description: Success

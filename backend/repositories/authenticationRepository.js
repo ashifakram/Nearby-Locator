@@ -63,6 +63,40 @@ export const AuthenticationRepository = {
     }
   },
 
+  /**
+   * Retrieves paginated authentication events for the Admin Operations Center.
+   */
+  async getAdminEvents({ search, eventCategory, eventType, limit = 50, offset = 0 }, executor = db) {
+    try {
+      return await withTransientRetry(async () => {
+        const query = executor('authentication_events').select('*');
+
+        if (eventCategory) query.where({ event_category: eventCategory });
+        if (eventType) query.where({ event_type: eventType });
+        if (search) {
+          query.where(builder => {
+            builder.whereRaw('user_id::text = ?', [search])
+                   .orWhereRaw(`metadata->>'ipAddress' = ?`, [search]);
+          });
+        }
+
+        const countQuery = query.clone().clearSelect().count('* as total').first();
+
+        const [countResult, events] = await Promise.all([
+          countQuery,
+          query.clone().orderBy('created_at', 'desc').limit(limit).offset(offset)
+        ]);
+
+        return {
+          total: Number(countResult?.total || 0),
+          events
+        };
+      });
+    } catch (err) {
+      throw handleDbError(err);
+    }
+  },
+
   // ==========================================
   // OAUTH DOMAIN
   // ==========================================

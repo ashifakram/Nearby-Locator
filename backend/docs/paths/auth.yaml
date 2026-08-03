@@ -297,3 +297,22 @@ ResendVerification:
               $ref: '../components/schemas.yaml#/StandardError'
       '429':
         $ref: '../components/responses.yaml#/TooManyRequests'
+
+
+SessionsGet:
+  get:
+    operationId: getAuthSessions
+    tags: [Auth]
+    summary: Get active auth sessions
+    responses:
+      '200':
+        description: Success
+
+ProviderDelete:
+  delete:
+    operationId: deleteProvider
+    tags: [Auth]
+    summary: Delete OAuth provider
+    responses:
+      '200':
+        description: Success

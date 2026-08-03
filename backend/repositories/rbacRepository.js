@@ -2,29 +2,23 @@ import db from '../db.js';
 
 export const RbacRepository = {
   /**
-   * Retrieves all permissions flattened for a given user.
+   * Retrieves all roles for a user.
    */
-  async getUserPermissions(userId, executor = db) {
-    const records = await executor('role_permissions as rp')
-      .join('users as u', 'u.role_id', 'rp.role_id')
-      .join('permissions as p', 'p.id', 'rp.permission_id')
-      .where('u.id', userId)
-      .select('p.name');
+  async getUserRoles(userId, executor = db) {
+    const records = await executor('user_roles as ur')
+      .join('roles as r', 'r.id', 'ur.role_id')
+      .where('ur.user_id', userId)
+      .select('r.*');
       
-    return records.map(r => r.name);
+    return records;
   },
 
   /**
-   * Retrieves the full role object for a user.
+   * Retrieves primary role for a user.
    */
   async getUserRole(userId, executor = db) {
-    const record = await executor('users as u')
-      .join('roles as r', 'r.id', 'u.role_id')
-      .where('u.id', userId)
-      .select('r.*')
-      .first();
-      
-    return record || null;
+    const roles = await this.getUserRoles(userId, executor);
+    return roles && roles.length > 0 ? roles[0] : null;
   },
 
   /**
@@ -59,9 +53,19 @@ export const RbacRepository = {
    * Assign a role to a user.
    */
   async assignUserRole(userId, roleId, executor = db) {
-    return await executor('users')
-      .where('id', userId)
-      .update({ role_id: roleId });
+    return await executor('user_roles')
+      .insert({ user_id: userId, role_id: roleId })
+      .onConflict(['user_id', 'role_id'])
+      .ignore();
+  },
+
+  /**
+   * Remove a role from a user.
+   */
+  async removeUserRole(userId, roleId, executor = db) {
+    return await executor('user_roles')
+      .where({ user_id: userId, role_id: roleId })
+      .delete();
   },
 
   /**
@@ -91,7 +95,8 @@ export const RbacRepository = {
    */
   async getActiveSuperAdminCount(executor = db) {
     const result = await executor('users as u')
-      .join('roles as r', 'r.id', 'u.role_id')
+      .join('user_roles as ur', 'ur.user_id', 'u.id')
+      .join('roles as r', 'r.id', 'ur.role_id')
       .where('r.name', 'Super Admin')
       .whereNotIn('u.status', ['BANNED', 'DISABLED'])
       .count('u.id as count')

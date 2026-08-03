@@ -9,6 +9,70 @@ Reports:
         content:
           application/json:
             schema:
-              $ref: '../components/schemas.yaml#/schemas/StandardSuccess'
+              $ref: '../components/schemas.yaml#/StandardSuccess'
       '401':
-        $ref: '../components/responses.yaml#/responses/Unauthorized'
+        $ref: '../components/responses.yaml#/Unauthorized'
+
+
+Appeals:
+  post:
+    operationId: submitAppeal
+    tags: [Moderation]
+    summary: Submit appeal
+    responses:
+      '200':
+        description: Success
+
+AdminQueue:
+  get:
+    operationId: getAdminQueue
+    tags: [Moderation]
+    summary: Get admin moderation queue
+    responses:
+      '200':
+        description: Success
+
+AdminResolveReport:
+  post:
+    operationId: adminResolveReport
+    tags: [Moderation]
+    summary: Resolve a report
+    responses:
+      '200':
+        description: Success
+
+AdminActionSpot:
+  post:
+    operationId: adminActionSpot
+    tags: [Moderation]
+    summary: Action a spot
+    responses:
+      '200':
+        description: Success
+
+AdminResolveAppeal:
+  post:
+    operationId: adminResolveAppeal
+    tags: [Moderation]
+    summary: Resolve an appeal
+    responses:
+      '200':
+        description: Success
+
+AdminReports:
+  get:
+    operationId: getAdminReports
+    tags: [Moderation]
+    summary: List all moderation reports for admin review
+    responses:
+      '200':
+        description: Reports retrieved successfully
+
+AdminAppeals:
+  get:
+    operationId: getAdminAppeals
+    tags: [Moderation]
+    summary: List all moderation appeals for admin review
+    responses:
+      '200':
+        description: Appeals retrieved successfully

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { MapControls } from '../../../components/ui/MapControls';
 
-export default function SpatialMap({
+function SpatialMapBase({
   spots = [],
   hoveredSpotId = null,
   setHoveredSpotId = () => {},
@@ -9,7 +10,9 @@ export default function SpatialMap({
   centerLat = 37.7749,
   centerLng = -122.4194,
   radiusMeters = 1000,
-  discoveredHistory = []
+  discoveredHistory = [],
+  onSearchArea = null,
+  isSearchingArea = false
 }) {
   const [zoom, setZoom] = useState(1.4);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -20,11 +23,17 @@ export default function SpatialMap({
   // Signature Area-Reveal wave key
   const [revealKey, setRevealKey] = useState(0);
 
+  // When center coordinates update from a fresh search, reset pan displacement
+  useEffect(() => {
+    setPan({ x: 0, y: 0 });
+  }, [centerLat, centerLng]);
+
   useEffect(() => {
     if (spots.length > 0) {
       setRevealKey((prev) => prev + 1);
     }
   }, [spots.length, centerLat, centerLng]);
+
 
   // Coordinate scales (SF scale approximation)
   const lngScale = 60000;
@@ -115,11 +124,11 @@ export default function SpatialMap({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
-      className={`w-full h-full relative bg-[#070A12] overflow-hidden select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''}`}
+      className={`w-full h-full relative bg-slate-900 dark:bg-slate-950 overflow-hidden select-none cursor-grab ${isDragging ? 'cursor-grabbing' : ''}`}
       style={{ touchAction: 'none' }}
     >
       {/* Self-contained CSS for signature progressive radar waves */}
-      <style dangerouslySetInnerHTML={{__html: `
+      <style>{`
         @keyframes spatialRevealRipple {
           0% { r: 0px; opacity: 0.4; stroke-width: 1.5px; }
           100% { r: ${280 * zoom}px; opacity: 0; stroke-width: 0.4px; }
@@ -127,7 +136,7 @@ export default function SpatialMap({
         .spatial-reveal-ring {
           animation: spatialRevealRipple 1.4s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
         }
-      `}} />
+      `}</style>
 
       {/* 1. Spatial Telemetry HUD */}
       <div className="absolute bottom-4 left-4 z-20 p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 backdrop-blur-md space-y-1.5 pointer-events-none max-w-[220px] shadow-2xl">
@@ -487,31 +496,59 @@ export default function SpatialMap({
         })}
       </svg>
 
-      {/* Floating Zoom & Controls buttons */}
-      <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-        <button
-          onClick={() => setZoom((prev) => Math.min(5, prev * 1.2))}
-          className="w-10 h-10 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-800 text-white font-bold text-lg flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
-        >
-          +
-        </button>
-        <button
-          onClick={() => setZoom((prev) => Math.max(0.5, prev / 1.2))}
-          className="w-10 h-10 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-800 text-white font-bold text-lg flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
-        >
-          −
-        </button>
-        <button
-          onClick={() => {
-            setPan({ x: 0, y: 0 });
-            setZoom(1.4);
-          }}
-          className="w-10 h-10 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-800 text-white text-xs flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
-          title="Recenter"
-        >
-          ⌖
-        </button>
-      </div>
+      {/* Viewport pan distance calculation for "Search This Area" */}
+      {(() => {
+        // Calculate current center coordinates based on pan offset
+        const currentCenterLng = centerLng - pan.x / (lngScale * zoom);
+        const currentCenterLat = centerLat + pan.y / (latScale * zoom);
+
+        // Haversine distance tracking (meters)
+        const R = 6371000;
+        const dLat = ((currentCenterLat - centerLat) * Math.PI) / 180;
+        const dLon = ((currentCenterLng - centerLng) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((centerLat * Math.PI) / 180) *
+            Math.cos((currentCenterLat * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const panDistanceMeters = R * c;
+
+        const showSearchAreaPill = panDistanceMeters > 500 && typeof onSearchArea === 'function';
+
+        return (
+          <MapControls
+            canRecenter={true}
+            canZoom={true}
+            canSearchArea={showSearchAreaPill}
+            isSearchingArea={isSearchingArea}
+            onSearchArea={() => {
+              if (onSearchArea) {
+                onSearchArea({ lat: currentCenterLat, lng: currentCenterLng });
+              }
+            }}
+            onZoomIn={() => setZoom((prev) => Math.min(5, prev * 1.2))}
+            onZoomOut={() => setZoom((prev) => Math.max(0.5, prev / 1.2))}
+            onRecenter={() => {
+              setPan({ x: 0, y: 0 });
+              setZoom(1.4);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
+
+export default React.memo(
+  SpatialMapBase,
+  (prev, next) =>
+    prev.hoveredSpotId === next.hoveredSpotId &&
+    (prev.selectedSpot?.id || prev.selectedSpot?.spotId) === (next.selectedSpot?.id || next.selectedSpot?.spotId) &&
+    prev.centerLat === next.centerLat &&
+    prev.centerLng === next.centerLng &&
+    prev.isSearchingArea === next.isSearchingArea &&
+    prev.spots.length === next.spots.length
+);
+

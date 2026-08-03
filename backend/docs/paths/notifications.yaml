@@ -1,0 +1,61 @@
+
+Preferences:
+  get:
+    operationId: getNotificationPreferences
+    tags: [Notifications]
+    summary: Get notification preferences
+    responses:
+      '200':
+        description: Success
+  put:
+    operationId: updateNotificationPreferences
+    tags: [Notifications]
+    summary: Update notification preferences
+    responses:
+      '200':
+        description: Success
+
+Test:
+  post:
+    operationId: testNotification
+    tags: [Notifications]
+    summary: Test notification
+    responses:
+      '200':
+        description: Success
+
+WebhookSubscriptions:
+  post:
+    operationId: subscribeWebhook
+    tags: [Notifications]
+    summary: Subscribe webhook
+    responses:
+      '200':
+        description: Success
+
+ProvidersWebhooks:
+  post:
+    operationId: handleProviderWebhook
+    tags: [Notifications]
+    summary: Handle provider webhook
+    responses:
+      '200':
+        description: Success
+
+Telemetry:
+  get:
+    operationId: getNotificationTelemetry
+    tags: [Notifications]
+    summary: Get notification telemetry
+    responses:
+      '200':
+        description: Success
+
+PasswordResetTrigger:
+  post:
+    operationId: passwordResetTrigger
+    tags: [Notifications]
+    summary: Password reset trigger
+    responses:
+      '200':
+        description: Success

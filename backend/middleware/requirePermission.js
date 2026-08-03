@@ -1,56 +1,56 @@
-import { RbacCache } from '../services/rbacCache.js';
-import { logger, correlationStore } from '../utils/logger.js';
-import { logAudit } from '../utils/auditLogger.js';
-import { rbacAuthorizationFailureTotal } from '../utils/metrics.js';
+import { PermissionService } from '../services/permissionService.js';
+import { logger } from '../utils/logger.js';
 
 /**
- * Middleware that strictly enforces permission-based authorization.
- * Relies on `req.user.id` being populated by the preceding `authJwt` middleware.
+ * Express middleware to enforce RBAC permissions.
+ * Fails closed on any errors.
  * 
- * @param {string} requiredPermission - Standardized resource.action (e.g. 'users.update')
+ * @param {string} requiredAction - The permission required (e.g. 'places.delete')
  */
-export const requirePermission = (requiredPermission) => {
+export const requirePermission = (requiredAction) => {
   return async (req, res, next) => {
     try {
+      // 1. Ensure user exists (must be placed after requireAuth)
       if (!req.user || !req.user.id) {
-        logger.warn('requirePermission called without authenticated user context');
-        return res.status(401).json({ error: 'Authentication required.' });
-      }
-
-      // Hydrate permissions from Redis cache (or lazy load from DB)
-      const permissions = await RbacCache.getUserPermissions(req.user.id);
-
-      if (!permissions.includes(requiredPermission)) {
-        const metadata = correlationStore.getStore();
-        logger.warn({ 
-          userId: req.user.id, 
-          requiredPermission, 
-          correlationId: metadata?.correlationId,
-          msg: 'Permission denied' 
-        });
-        
-        rbacAuthorizationFailureTotal.labels(requiredPermission).inc();
-
-        logAudit({
-          req,
-          actorId: req.user.id,
-          action: 'RBAC_PERMISSION_DENIED',
-          severity: 'WARN',
-          metadata: { requiredPermission }
-        }).catch(err => logger.error({ err }, 'Failed to log RBAC audit event'));
-        
-        return res.status(403).json({ 
-          error: 'Forbidden.', 
-          message: `This action requires the '${requiredPermission}' permission.`
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required'
+          }
         });
       }
 
-      // Attach permissions to request for downstream controllers if needed
-      req.user.permissions = permissions;
-      next();
+      const userId = req.user.id;
+
+      // 2. Resolve Permissions
+      const { permissions } = await PermissionService.getUserPermissions(userId);
+
+      // 3. Evaluate Access
+      if (permissions.includes(requiredAction)) {
+        return next();
+      }
+
+      // 4. Deny Access
+      logger.warn(`[AUTHZ] Permission Denied: User ${userId} lacks ${requiredAction}`);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'ACTION_FORBIDDEN',
+          message: 'You do not have permission to perform this action.'
+        }
+      });
+      
     } catch (err) {
-      logger.error({ err, userId: req?.user?.id }, 'Error during permission verification');
-      return res.status(500).json({ error: 'Internal server error during authorization.' });
+      // 5. Fail Closed on exceptions
+      logger.error(`[AUTHZ] System Error during permission evaluation for user ${req.user?.id}`, err);
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'ACTION_FORBIDDEN', // Return standard 403 to frontend to obscure system failure
+          message: 'An error occurred while verifying your permissions. Access denied.'
+        }
+      });
     }
   };
 };

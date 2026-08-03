@@ -1,6 +1,7 @@
 import { SpotRepository } from '../repositories/spotRepository.js';
 import { sendError } from '../middleware/responseFormatter.js';
 import { dbLogger } from '../utils/dbLogger.js';
+import { trackEvent } from '../jobs/analyticsJobs.js';
 
 // Structured operational metrics helper
 const recordGeoTelemetry = (metricType, payload) => {
@@ -101,12 +102,56 @@ export const searchSpots = async (req, res) => {
       });
     }
 
+    // Emit analytics events asynchronously (non-blocking)
+    const userId = req.user?.id || null;
+    const requestId = req.correlationId || req.headers?.['x-request-id'] || null;
+
+    trackEvent({
+      eventType: 'PRODUCT',
+      eventName: 'search_executed',
+      userId,
+      requestId,
+      rawIp: req.ip,
+      payload: {
+        category: category || 'all',
+        query: req.query.q || category || 'nearby',
+        result_count: result.data.length,
+        latency_ms: duration,
+        cache_status: res.getHeader('X-Geo-Cache') || 'BYPASS'
+      }
+    }).catch(() => {});
+
+    if (result.data.length === 0) {
+      trackEvent({
+        eventType: 'PRODUCT',
+        eventName: 'search_zero_results',
+        userId,
+        requestId,
+        rawIp: req.ip,
+        payload: {
+          query: req.query.q || category || 'nearby',
+          category: category || 'all'
+        }
+      }).catch(() => {});
+    }
+
     return res.json({
       data: result.data,
       nextCursor: result.nextCursor
     });
   } catch (err) {
     dbLogger.error('Spot search endpoint failure', err);
+    trackEvent({
+      eventType: 'PRODUCT',
+      eventName: 'search_failed',
+      userId: req.user?.id || null,
+      requestId: req.correlationId || req.headers?.['x-request-id'] || null,
+      rawIp: req.ip,
+      payload: {
+        query: req.query?.q || 'nearby',
+        reason: err.message || 'DATABASE_ERROR'
+      }
+    }).catch(() => {});
     return sendError(res, { code: 'DATABASE_ERROR' }, 'Internal server database error during search.', 500);
   }
 };

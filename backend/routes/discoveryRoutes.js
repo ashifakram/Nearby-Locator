@@ -35,7 +35,13 @@ router.post('/click', geoRateLimiter(60, 60), lenientAuthJwt, DiscoveryControlle
 // 3. Save location to list (requires strict authentication)
 router.post('/save', geoRateLimiter(20, 60), authJwt, DiscoveryController.saveLocation);
 
-// 4. Retrieve CTR search telemetry details
+// 4. Retrieve saved locations (requires strict authentication)
+router.get('/saves', geoRateLimiter(30, 60), authJwt, DiscoveryController.getSaves);
+
+// 5. Retrieve search history (requires strict authentication)
+router.get('/history', geoRateLimiter(30, 60), authJwt, DiscoveryController.getHistory);
+
+// 6. Retrieve CTR search telemetry details
 router.get('/telemetry', geoRateLimiter(30, 60), DiscoveryController.getTelemetry);
 
 // 5. Autocomplete suggestions (rate limited)

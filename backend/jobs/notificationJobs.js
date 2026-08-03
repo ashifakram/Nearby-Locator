@@ -1,6 +1,5 @@
 import db from '../db.js';
 import client from '../redisClient.js';
-import { ProviderRegistry } from '../providers/providerFactory.js';
 import { NotificationTemplates } from '../templates/notificationTemplates.js';
 import { WebhookService } from '../services/webhookService.js';
 import { logger } from '../utils/logger.js';

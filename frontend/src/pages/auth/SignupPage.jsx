@@ -1,145 +1,287 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { User, Mail, Lock, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { authService } from '../../services/auth';
+import { useAuthStore } from '../../store/useAuthStore';
 import { useToastStore } from '../../store/useToastStore';
 import { normalizeError } from '../../utils/errors';
-import LoaderIcon from '../../icons/LoaderIcon';
 import GoogleLoginButton from '../../components/GoogleLoginButton';
+import PasswordStrengthIndicator from '../../components/auth/PasswordStrengthIndicator';
+import {
+  AuthCard,
+  AuthPageTitle,
+  AuthDivider,
+  AuthFooter,
+  AuthLink,
+  AuthSubmitButton,
+  AuthFloatingInput,
+  FormAlert,
+  PasswordToggleButton,
+} from '../../components/auth/AuthComponents';
 
-// Zod validation schema for signup (Problem 6 Form Architecture)
-const signupSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().min(1, 'Email is required').email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
+const signupSchema = z
+  .object({
+    name: z.string().min(2, 'Name must be at least 2 characters'),
+    email: z.string().min(1, 'Email is required').email('Invalid email address'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+    termsAccepted: z.boolean().refine((val) => val === true, {
+      message: 'You must accept the terms and conditions',
+    }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const triggerNavigation = useAuthStore((state) => state.triggerNavigation);
   const { showToast } = useToastStore();
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const abortControllerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, []);
 
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
+    setError,
+    setFocus,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(signupSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-    },
+    defaultValues: { name: '', email: '', password: '', confirmPassword: '', termsAccepted: false },
+    shouldFocusError: true,
   });
 
+  const passwordValue = watch('password');
+  const confirmPasswordValue = watch('confirmPassword');
+
+  const isConfirmTyped = Boolean(confirmPasswordValue && confirmPasswordValue.length > 0);
+  const isPasswordMatch = isConfirmTyped && confirmPasswordValue === passwordValue;
+  const isPasswordMismatch = isConfirmTyped && confirmPasswordValue !== passwordValue;
+
   const onSubmit = async (data) => {
+    if (isSubmitting) return;
+    abortControllerRef.current = new AbortController();
+
     try {
-      await authService.signup(data.name, data.email, data.password);
-      showToast('Account created! Please check your email to verify your account.', 'success');
-      navigate('/login', { state: { registered: true } });
+      await authService.signup(data.name, data.email, data.password, abortControllerRef.current.signal);
+      navigate('/verify-email', { state: { email: data.email } });
     } catch (err) {
-      const friendlyErr = normalizeError(err);
-      showToast(friendlyErr, 'error');
+      if (err.name === 'CanceledError') return;
+      const code = err.code;
+      const status = err.status;
+
+      if (code === 'DUPLICATE_EMAIL') {
+        setValue('password', '');
+        setValue('confirmPassword', '');
+        setError('email', { message: 'Email already exists. Please log in.' });
+        setFocus('email');
+      } else if (code === 'VALIDATION_FAILED' || status === 400) {
+        const backendErrors = err.response?.data?.error?.details || [];
+        if (backendErrors.length > 0) {
+          backendErrors.forEach((fieldErr) => {
+            if (fieldErr.field) setError(fieldErr.field, { message: fieldErr.message });
+            else setError('root.serverError', { message: fieldErr.message });
+          });
+        } else {
+          setError('root.serverError', { message: err.message || 'Registration failed due to invalid data.' });
+        }
+      } else if (code === 'DELIVERY_FAILURE' || status === 500) {
+        triggerNavigation('/email-delivery-failed');
+      } else {
+        showToast(normalizeError(err), 'error');
+      }
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-3xl font-extrabold tracking-tight text-white">Get Started</h2>
-        <p className="text-sm text-slate-400 mt-2">Create an account to explore premium spots</p>
-      </div>
+    <>
+      <AuthCard>
+        <AuthPageTitle
+          title="Get Started"
+          subtitle="Create your account to explore places with AI."
+        />
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Name Field */}
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-300">Full Name</label>
-          <input
+        {errors.root?.serverError && (
+          <FormAlert type="error">{errors.root.serverError.message}</FormAlert>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <AuthFloatingInput
+            id="name"
+            label="Full Name"
             type="text"
-            placeholder="John Doe"
+            placeholder="Jane Doe"
+            autoComplete="name"
+            leftIcon={User}
+            error={errors.name?.message}
             disabled={isSubmitting}
             {...register('name')}
-            className={`w-full rounded-2xl px-4 py-3 bg-slate-800/40 border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200 ${
-              errors.name ? 'border-red-500/50' : 'border-slate-850'
-            } text-white`}
           />
-          {errors.name && (
-            <span className="text-xs text-red-400 font-semibold px-2">{errors.name.message}</span>
-          )}
-        </div>
 
-        {/* Email Field */}
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-300">Email Address</label>
-          <input
+          <AuthFloatingInput
+            id="email"
+            label="Email address"
             type="email"
-            placeholder="name@example.com"
+            placeholder="you@example.com"
+            autoComplete="username"
+            leftIcon={Mail}
+            error={errors.email?.message}
             disabled={isSubmitting}
             {...register('email')}
-            className={`w-full rounded-2xl px-4 py-3 bg-slate-800/40 border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200 ${
-              errors.email ? 'border-red-500/50' : 'border-slate-850'
-            } text-white`}
           />
-          {errors.email && (
-            <span className="text-xs text-red-400 font-semibold px-2">{errors.email.message}</span>
-          )}
-        </div>
 
-        {/* Password Field */}
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-300">Password</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            disabled={isSubmitting}
-            {...register('password')}
-            className={`w-full rounded-2xl px-4 py-3 bg-slate-800/40 border focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-200 ${
-              errors.password ? 'border-red-500/50' : 'border-slate-850'
-            } text-white`}
-          />
-          {errors.password && (
-            <span className="text-xs text-red-400 font-semibold px-2">{errors.password.message}</span>
-          )}
-        </div>
+          <div>
+            <AuthFloatingInput
+              id="password"
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+              leftIcon={Lock}
+              error={errors.password?.message}
+              disabled={isSubmitting}
+              rightSlot={
+                <PasswordToggleButton
+                  show={showPassword}
+                  onToggle={() => setShowPassword((v) => !v)}
+                />
+              }
+              {...register('password')}
+            />
+            <PasswordStrengthIndicator password={passwordValue} />
+          </div>
 
-        {/* Submit button */}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full h-12 rounded-2xl font-bold btn-primary-spatial transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mt-6"
-        >
-          {isSubmitting ? (
-            <>
-              <LoaderIcon width={20} height={20} color="cyan" />
-              <span>Registering...</span>
-            </>
-          ) : (
+          <div>
+            <AuthFloatingInput
+              id="confirmPassword"
+              label="Confirm Password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              placeholder="Re-enter password"
+              autoComplete="new-password"
+              leftIcon={Lock}
+              error={errors.confirmPassword?.message}
+              disabled={isSubmitting}
+              rightSlot={
+                <div className="flex items-center gap-1.5">
+                  <AnimatePresence mode="wait">
+                    {isPasswordMatch && (
+                      <motion.div
+                        key="match-icon"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        className="text-emerald-500"
+                        title="Passwords match"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                      </motion.div>
+                    )}
+                    {isPasswordMismatch && (
+                      <motion.div
+                        key="mismatch-icon"
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: [1, 1.2, 1], opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        className="text-rose-500"
+                        title="Passwords do not match"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <PasswordToggleButton
+                    show={showConfirmPassword}
+                    onToggle={() => setShowConfirmPassword((v) => !v)}
+                  />
+                </div>
+              }
+              {...register('confirmPassword')}
+            />
+
+            {/* Live Password Match / Mismatch Feedback Badge */}
+            {isConfirmTyped && !errors.confirmPassword?.message && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-1.5 px-1 text-xs font-semibold"
+              >
+                {isPasswordMatch ? (
+                  <span className="text-emerald-600 flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5" /> Passwords match
+                  </span>
+                ) : (
+                  <span className="text-rose-600 flex items-center gap-1">
+                    <XCircle className="w-3.5 h-3.5" /> Passwords do not match
+                  </span>
+                )}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Terms and Conditions */}
+          <div className="flex items-start gap-2.5 pt-1">
+            <input
+              id="termsAccepted"
+              type="checkbox"
+              disabled={isSubmitting}
+              {...register('termsAccepted')}
+              className={`mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 cursor-pointer ${
+                errors.termsAccepted ? 'border-rose-400' : ''
+              }`}
+            />
+            <div className="text-xs text-slate-600 font-sans leading-relaxed">
+              <label htmlFor="termsAccepted" className="cursor-pointer">
+                I agree to the{' '}
+                <Link to="/terms" className="text-blue-600 hover:underline font-semibold" target="_blank" rel="noopener noreferrer">
+                  Terms of Service
+                </Link>
+                {' '}and{' '}
+                <Link to="/privacy" className="text-blue-600 hover:underline font-semibold" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </Link>
+                .
+              </label>
+              {errors.termsAccepted && (
+                <p role="alert" className="mt-1 text-rose-600 font-semibold">
+                  {errors.termsAccepted.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <AuthSubmitButton isLoading={isSubmitting} loadingLabel="Creating account…" className="mt-2">
             <span>Create Account</span>
-          )}
-        </button>
-      </form>
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+          </AuthSubmitButton>
 
-      <div className="relative my-6 flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-800" />
-        </div>
-        <span className="relative bg-[#0F1322] px-3 text-xs uppercase text-slate-500 font-semibold tracking-wider">
-          Or Continue With
-        </span>
-      </div>
+          <AuthDivider />
 
-      <GoogleLoginButton />
+          <div className="flex flex-col gap-3">
+            <GoogleLoginButton variant="minimal" label="Sign up with Google" />
+          </div>
+        </form>
+      </AuthCard>
 
-      <div className="text-center text-sm text-slate-400 mt-6">
+      <AuthFooter>
         Already have an account?{' '}
-        <button
-          onClick={() => navigate('/login')}
-          className="font-semibold text-cyan-400 hover:underline focus:outline-none"
-        >
-          Sign In
-        </button>
-      </div>
-    </div>
+        <AuthLink onClick={() => navigate('/login')}>Sign In</AuthLink>
+      </AuthFooter>
+    </>
   );
 }

@@ -18,14 +18,19 @@ test.describe('📢 Discovery, Composite Ranking, and Telelevance Infrastructure
     await cleanDatabase();
 
     // Seed a standard user to test authenticated actions and saves
+    let roleRecord = await db('roles').whereILike('name', 'User').first();
+    if (!roleRecord) {
+      const [newRole] = await db('roles').insert({ name: 'User', description: 'User', is_system: true, priority: 10 }).returning('*');
+      roleRecord = newRole;
+    }
     const [user] = await db('users')
       .insert({
         email: 'discovery.test@locator.com',
         password_hash: 'mock_password_hash',
-        role: 'user'
-      })
-      .returning('*');
-    testUser = user;
+        status: 'VERIFIED'
+      }).returning('*');
+      await db('user_roles').insert({ user_id: user.id, role_id: roleRecord.id });
+      testUser = user;
 
     const jwt = (await import('jsonwebtoken')).default;
     testToken = jwt.sign(

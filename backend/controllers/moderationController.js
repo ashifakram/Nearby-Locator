@@ -1,8 +1,10 @@
 import db from '../db.js';
 import { ModerationService } from '../services/moderationService.js';
+import { NotificationService } from '../services/notificationService.js';
 import { sendSuccess, sendError } from '../middleware/responseFormatter.js';
 import { logAudit } from '../utils/auditLogger.js';
 import { logger } from '../utils/logger.js';
+import { buildSortClause, buildPaginationClause } from '../utils/queryUtils.js';
 
 export const submitReport = async (req, res) => {
   const trx = await db.transaction();
@@ -216,6 +218,17 @@ export const moderatorAction = async (req, res) => {
     // Authoritative creator user score recalculation if exists
     if (spot.creator_id) {
       await ModerationService.recalculateTrustScore(spot.creator_id, 'user', trx);
+      const creator = await trx('users').where({ id: spot.creator_id }).first();
+      if (creator) {
+        await NotificationService.sendNotification({
+          userId: creator.id,
+          channel: 'email',
+          category: 'account',
+          target: creator.email,
+          templateId: 'spot_moderated',
+          payload: { spotTitle: spot.title, action: nextStatus, reason, notes: notes || '' }
+        }, trx);
+      }
     }
 
     await trx.commit();
@@ -310,6 +323,19 @@ export const resolveAppeal = async (req, res) => {
       });
     }
 
+    const appellant = await trx('users').where({ id: appeal.user_id }).first();
+    const spotForEmail = await trx('spots').where({ id: appeal.spot_id }).first();
+    if (appellant && spotForEmail) {
+      await NotificationService.sendNotification({
+        userId: appellant.id,
+        channel: 'email',
+        category: 'account',
+        target: appellant.email,
+        templateId: 'appeal_resolved',
+        payload: { spotTitle: spotForEmail.title, action: nextStatus, reason }
+      }, trx);
+    }
+
     await trx.commit();
 
     await logAudit({
@@ -330,7 +356,9 @@ export const resolveAppeal = async (req, res) => {
 
 export const getModerationQueue = async (req, res) => {
   try {
-    const queue = await db('spots')
+    const { limit, offset, page } = buildPaginationClause(req.query);
+
+    const query = db('spots')
       .select('spots.*')
       .leftJoin('reports', 'reports.spot_id', 'spots.id')
       .select(db.raw(`
@@ -348,13 +376,70 @@ export const getModerationQueue = async (req, res) => {
       `))
       .where('spots.moderation_status', 'QUARANTINED')
       .orWhere('reports.status', 'PENDING')
-      .groupBy('spots.id')
-      .orderBy('priority_score', 'desc')
-      .orderBy('spots.created_at', 'desc');
+      .groupBy('spots.id');
 
-    return sendSuccess(res, queue, 'Moderation queue retrieved successfully.');
+    const countQuery = db.from(query.clone().as('q')).count('* as total').first();
+    
+    const [countResult, queue] = await Promise.all([
+      countQuery,
+      query.clone()
+        .orderBy('priority_score', 'desc')
+        .orderBy('spots.created_at', 'desc')
+        .limit(limit)
+        .offset(offset)
+    ]);
+
+    return sendSuccess(res, { total: Number(countResult?.total || 0), limit, page, queue }, 'Moderation queue retrieved successfully.');
   } catch (err) {
     logger.error('GET_MODERATION_QUEUE_FAILED', err);
     return sendError(res, { code: 'DATABASE_ERROR' }, 'Internal database error fetching moderation queue.', 500);
+  }
+};
+
+export const getAdminReports = async (req, res) => {
+  try {
+    const { limit, offset, page } = buildPaginationClause(req.query);
+    const { column, order } = buildSortClause(req.query, 'created_at', 'desc', ['created_at', 'status']);
+    
+    const query = db('reports')
+      .join('users as reporter', 'reports.reporter_id', 'reporter.id')
+      .join('spots', 'reports.spot_id', 'spots.id')
+      .select('reports.*', 'reporter.email as reporter_email', 'spots.title as spot_title');
+      
+    if (req.query.status) query.where('reports.status', req.query.status);
+    
+    const countQuery = query.clone().clearSelect().count('* as total').first();
+    const [countResult, reports] = await Promise.all([
+      countQuery,
+      query.clone().orderBy(column === 'created_at' ? 'reports.created_at' : `reports.${column}`, order).limit(limit).offset(offset)
+    ]);
+    
+    return sendSuccess(res, { total: Number(countResult?.total || 0), limit, page, reports }, 'Reports retrieved.');
+  } catch (err) {
+    return sendError(res, { code: 'DATABASE_ERROR' }, 'Error fetching reports.', 500);
+  }
+};
+
+export const getAdminAppeals = async (req, res) => {
+  try {
+    const { limit, offset, page } = buildPaginationClause(req.query);
+    const { column, order } = buildSortClause(req.query, 'created_at', 'desc', ['created_at', 'status']);
+    
+    const query = db('moderation_appeals')
+      .join('users as appellant', 'moderation_appeals.user_id', 'appellant.id')
+      .join('spots', 'moderation_appeals.spot_id', 'spots.id')
+      .select('moderation_appeals.*', 'appellant.email as appellant_email', 'spots.title as spot_title');
+      
+    if (req.query.status) query.where('moderation_appeals.status', req.query.status);
+    
+    const countQuery = query.clone().clearSelect().count('* as total').first();
+    const [countResult, appeals] = await Promise.all([
+      countQuery,
+      query.clone().orderBy(column === 'created_at' ? 'moderation_appeals.created_at' : `moderation_appeals.${column}`, order).limit(limit).offset(offset)
+    ]);
+    
+    return sendSuccess(res, { total: Number(countResult?.total || 0), limit, page, appeals }, 'Appeals retrieved.');
+  } catch (err) {
+    return sendError(res, { code: 'DATABASE_ERROR' }, 'Error fetching appeals.', 500);
   }
 };

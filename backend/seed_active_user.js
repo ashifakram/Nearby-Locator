@@ -13,12 +13,16 @@ async function seed() {
     const role = await RbacRepository.getRoleByName('User');
     const passwordHash = await IdentityService.hashPassword(password);
     
-    await db('users').insert({
+    const [user] = await db('users').insert({
       email,
       password_hash: passwordHash,
       status: 'ACTIVE',
-      role_id: role.id,
       name: 'Flow Two Tester'
+    }).returning('*');
+
+    await db('user_roles').insert({
+      user_id: user.id,
+      role_id: role.id
     });
 
     console.log('ACTIVE user seeded successfully.');

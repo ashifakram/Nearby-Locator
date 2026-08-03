@@ -272,6 +272,35 @@ export const DiscoveryController = {
   },
 
   /**
+   * Retrieve saved spots for the authenticated user.
+   */
+  async getSaves(req, res, next) {
+    try {
+      if (!req.user || !req.user.id) {
+        throw new ValidationError('Authentication is required to view saved locations.');
+      }
+      
+      const { limit, offset } = req.query;
+      const parsedLimit = limit ? parseInt(limit, 10) : 50;
+      const parsedOffset = offset ? parseInt(offset, 10) : 0;
+
+      const { data, totalCount } = await SpotRepository.findSavedSpotsByUserId(req.user.id, parsedLimit, parsedOffset);
+
+      return res.status(200).json({
+        success: true,
+        data,
+        meta: {
+          limit: parsedLimit,
+          offset: parsedOffset,
+          count: totalCount
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  /**
    * Calculate discovery telemetry metrics including Click-Through-Rate (CTR),
    * zero-result query frequencies, and detailed composite ranking distributions.
    */
@@ -319,6 +348,58 @@ export const DiscoveryController = {
           rank: parseInt(c.rank, 10),
           clicks: parseInt(c.count, 10)
         }))
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  /**
+   * Retrieve the user's search history
+   */
+  async getHistory(req, res, next) {
+    try {
+      if (!req.user || !req.user.id) {
+        throw new ValidationError('Authentication is required to view search history.');
+      }
+      
+      const { limit, offset } = req.query;
+      const parsedLimit = limit ? parseInt(limit, 10) : 50;
+      const parsedOffset = offset ? parseInt(offset, 10) : 0;
+      
+      // Enforce bounds
+      const safeLimit = Math.min(Math.max(parsedLimit, 1), 100);
+      const safeOffset = Math.max(parsedOffset, 0);
+
+      const query = db('discovery_searches').where({ user_id: req.user.id });
+
+      const [countResult, history] = await Promise.all([
+        query.clone().count('id as count').first(),
+        query.clone()
+          .select(
+            'id',
+            'query_text',
+            'category',
+            'latitude',
+            'longitude',
+            'results_count',
+            'created_at'
+          )
+          .orderBy('created_at', 'desc')
+          .limit(safeLimit)
+          .offset(safeOffset)
+      ]);
+
+      const count = parseInt(countResult?.count || 0, 10);
+
+      return res.status(200).json({
+        success: true,
+        data: history,
+        meta: {
+          limit: safeLimit,
+          offset: safeOffset,
+          count
+        }
       });
     } catch (err) {
       next(err);

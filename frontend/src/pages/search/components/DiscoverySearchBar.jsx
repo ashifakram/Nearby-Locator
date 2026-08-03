@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FilterPanel } from '../../../components/ui/FilterPanel';
 
 export default function DiscoverySearchBar({
   value = '',
@@ -6,13 +7,18 @@ export default function DiscoverySearchBar({
   onSearch = () => {},
   suggestions = [],
   loading = false,
-  placeholder = 'Search by spot name or category...',
+  placeholder = 'Search spots, categories, or vibes...',
   selectedVibe = '',
-  onVibeSelect = () => {}
+  onVibeSelect = () => {},
+  filters = { radius: 5, rating: 0, openNow: false, category: '' },
+  onApplyFilters = () => {},
+  activeFilterCount = 0
 }) {
   const [isFocused, setIsFocused] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
   const containerRef = useRef(null);
+
 
   // Load recent searches from memory
   useEffect(() => {
@@ -79,11 +85,13 @@ export default function DiscoverySearchBar({
       
       {/* 1. Interactive Animated Search Input (Focus Expansion) */}
       <div
-        className={`relative flex items-center h-12 rounded-2xl px-4 transition-all duration-400 bg-slate-950/70 border backdrop-blur-md shadow-2xl ${
-          isFocused ? 'border-cyan-500/40 ring-2 ring-cyan-500/10 scale-[1.01]' : 'border-slate-850'
+        className={`relative flex items-center h-11 rounded-2xl px-4 transition-all duration-300 bg-slate-100/80 dark:bg-slate-900/80 border backdrop-blur-md shadow-sm ${
+          isFocused
+            ? 'border-blue-500/50 ring-2 ring-blue-500/10 bg-white dark:bg-slate-900'
+            : 'border-slate-200/80 dark:border-slate-800/80'
         }`}
       >
-        <span className="text-slate-500 mr-3">🔍</span>
+        <span className="text-slate-400 mr-2.5 text-sm">🔍</span>
         <input
           type="text"
           value={value}
@@ -92,33 +100,63 @@ export default function DiscoverySearchBar({
           onKeyDown={handleKeyPress}
           placeholder={placeholder}
           disabled={loading}
-          className="flex-grow bg-transparent text-sm text-slate-100 placeholder:text-slate-500 outline-none w-full"
+          className="flex-grow bg-transparent text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 font-sans outline-none w-full"
         />
 
         {loading ? (
-          <div className="w-5 h-5 rounded-full border-2 border-cyan-500/20 border-t-cyan-500 animate-spin flex-shrink-0" />
+          <div className="w-4 h-4 rounded-full border-2 border-blue-500/20 border-t-blue-600 animate-spin shrink-0 mr-2" />
         ) : value ? (
           <button
             onClick={() => onChange('')}
-            className="text-xs text-slate-500 hover:text-slate-300 font-bold px-1.5 flex-shrink-0"
+            className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-bold px-1.5 shrink-0 transition-colors mr-1"
           >
             ✕
           </button>
         ) : null}
+
+        {/* Filter Panel Trigger Button */}
+        <button
+          type="button"
+          onClick={() => setFilterOpen(!filterOpen)}
+          aria-label="Open discovery filters"
+          className={`px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 border ${
+            activeFilterCount > 0
+              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700 shadow-2xs'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-slate-100'
+          }`}
+        >
+          <span>⚙️</span>
+          <span className="hidden sm:inline">Filter</span>
+          {activeFilterCount > 0 && (
+            <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-mono flex items-center justify-center font-bold">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
 
+      {/* Reusable FilterPanel Popover / Drawer */}
+      <FilterPanel
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        onApply={onApplyFilters}
+        initialFilters={filters}
+        activeCount={activeFilterCount}
+      />
+
+
       {/* 2. Emotional vibe filtering pivots horizontal list (Objective 2) */}
-      <div className="flex gap-1.5 overflow-x-auto scrollbar-hidden pb-1">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
         {emotionalVibes.map((vibe) => {
           const isActive = selectedVibe === vibe.key;
           return (
             <button
               key={vibe.key}
               onClick={() => onVibeSelect(isActive ? '' : vibe.key)}
-              className={`px-3 py-1 rounded-full text-[10px] font-mono tracking-wider font-semibold whitespace-nowrap transition-all duration-300 ${
+              className={`px-3 py-1 rounded-full text-[11px] font-mono tracking-wider font-semibold whitespace-nowrap transition-all duration-200 ${
                 isActive
-                  ? 'bg-cyan-500/20 border border-cyan-500/40 text-cyan-400'
-                  : 'bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-50 dark:bg-blue-950/50 border border-blue-500/40 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
               {vibe.label}
@@ -129,12 +167,12 @@ export default function DiscoverySearchBar({
 
       {/* 3. Autocomplete & Recent History overlay dropdowns */}
       {isFocused && (
-        <div className="absolute top-14 left-0 right-0 rounded-2xl border border-slate-850 p-2 shadow-2xl backdrop-blur-xl bg-slate-950/95 z-[9999] overflow-hidden max-h-[260px] overflow-y-auto space-y-3">
+        <div className="absolute top-14 left-0 right-0 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 p-2 shadow-2xl backdrop-blur-xl bg-white/95 dark:bg-slate-900/95 z-[9999] overflow-hidden max-h-[260px] overflow-y-auto space-y-3">
           
           {/* Autocomplete suggestions */}
           {suggestions && suggestions.length > 0 ? (
             <div className="space-y-1">
-              <p className="text-[10px] font-mono text-cyan-400 font-semibold px-2 uppercase tracking-wider">
+              <p className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-semibold px-2 uppercase tracking-wider">
                 Suggestions Found
               </p>
               {suggestions.map((item, idx) => {
@@ -148,7 +186,7 @@ export default function DiscoverySearchBar({
                       saveRecentSearch(phrase);
                       setIsFocused(false);
                     }}
-                    className="w-full text-left px-2 py-1.5 rounded-xl hover:bg-slate-900 text-xs text-slate-300 transition-colors duration-150 flex items-center gap-2"
+                    className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 text-xs text-slate-700 dark:text-slate-300 transition-colors duration-150 flex items-center gap-2"
                   >
                     <span>📍</span>
                     <span className="truncate">{phrase}</span>
@@ -157,7 +195,7 @@ export default function DiscoverySearchBar({
               })}
             </div>
           ) : value.trim().length >= 2 ? (
-            <div className="text-center py-4 text-xs text-slate-500 font-body">
+            <div className="text-center py-4 text-xs text-slate-500 dark:text-slate-400 font-sans">
               No direct autocompletes. Press enter to search fully.
             </div>
           ) : null}
@@ -165,7 +203,7 @@ export default function DiscoverySearchBar({
           {/* Recent Searches */}
           {recentSearches.length > 0 && (
             <div className="space-y-1">
-              <p className="text-[10px] font-mono text-slate-500 font-semibold px-2 uppercase tracking-wider">
+              <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 font-semibold px-2 uppercase tracking-wider">
                 Recent Searches
               </p>
               {recentSearches.map((item, idx) => (
@@ -176,7 +214,7 @@ export default function DiscoverySearchBar({
                     onSearch(item);
                     setIsFocused(false);
                   }}
-                  className="w-full text-left px-2 py-1.5 rounded-xl hover:bg-slate-900 text-xs text-slate-400 hover:text-slate-300 transition-colors duration-150 flex items-center gap-2"
+                  className="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors duration-150 flex items-center gap-2"
                 >
                   <span>⏱</span>
                   <span className="truncate">{item}</span>
@@ -186,8 +224,8 @@ export default function DiscoverySearchBar({
           )}
 
           {/* Helper quick tips tags */}
-          <div className="pt-1.5 border-t border-slate-900">
-            <p className="text-[9px] font-mono text-slate-500 font-semibold px-2 uppercase tracking-wider mb-1.5">
+          <div className="pt-1.5 border-t border-slate-200/80 dark:border-slate-800/80">
+            <p className="text-[9px] font-mono text-slate-400 dark:text-slate-500 font-semibold px-2 uppercase tracking-wider mb-1.5">
               Explore categories
             </p>
             <div className="flex flex-wrap gap-1.5 px-2">
@@ -200,7 +238,7 @@ export default function DiscoverySearchBar({
                     saveRecentSearch(cat);
                     setIsFocused(false);
                   }}
-                  className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-850 text-[10px] text-slate-400 hover:text-white hover:border-cyan-500/30 transition-all duration-150"
+                  className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-[10px] text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-500/30 transition-all duration-150"
                 >
                   {cat}
                 </button>

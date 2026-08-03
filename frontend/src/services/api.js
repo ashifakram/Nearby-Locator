@@ -1,29 +1,9 @@
 import axios from 'axios';
 import { config } from '../app/config';
 import { useAuthStore } from '../store/useAuthStore';
+import { useUIStore } from '../store/useUIStore';
 import { logger } from '../utils/logger';
-
-// 1. Volatile strictly in-memory access token closure (Problem 1 Security)
-let inMemoryAccessToken = null;
-let isRefreshing = false;
-let refreshSubscribers = [];
-
-export function setInMemoryAccessToken(token) {
-  inMemoryAccessToken = token;
-}
-
-export function getInMemoryAccessToken() {
-  return inMemoryAccessToken;
-}
-
-function subscribeTokenRefresh(cb) {
-  refreshSubscribers.push(cb);
-}
-
-function onTokenRefreshed(token) {
-  refreshSubscribers.forEach((cb) => cb(token));
-  refreshSubscribers = [];
-}
+import { getInMemoryAccessToken, executeTokenRefreshMutex } from './tokenOrchestrator';
 
 export const api = axios.create({
   baseURL: config.apiUrl,
@@ -31,24 +11,81 @@ export const api = axios.create({
   withCredentials: true, // Support secure HTTP-only cookies
 });
 
-// 2. Request Interceptor: Attach bearer authorization dynamically
+// Request Interceptor: Attach bearer authorization dynamically
 api.interceptors.request.use(
   (req) => {
-    if (inMemoryAccessToken) {
-      req.headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
+    const token = getInMemoryAccessToken();
+    if (token) {
+      req.headers['Authorization'] = `Bearer ${token}`;
     }
     return req;
   },
   (err) => Promise.reject(err)
 );
 
-// 3. Response Interceptor: Single-Flight Refresh Mutex & Replay Queue (Problem 2 Resiliency)
+// Response Interceptor: Single-Flight Refresh Mutex & Replay Queue
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    // Successful response implies network is online
+    useUIStore.getState().setNetworkOffline(false);
+    return res;
+  },
   async (error) => {
     const originalRequest = error.config;
     
-    // Check if error is unauthorized and has not already been retried
+    // 1. Separate Browser Offline Detection from Backend Failures
+    if (error.request && !error.response) {
+      if (!navigator.onLine) {
+        useUIStore.getState().setNetworkOffline(true);
+      } else if (error.code === 'ECONNABORTED') {
+        // Request timeout
+        if (window.location.pathname !== '/504') {
+          useAuthStore.getState().triggerNavigation('/504');
+        }
+      } else {
+        // Network error (e.g. DNS failure, connection refused) while browser is online
+        if (window.location.pathname !== '/503') {
+          useAuthStore.getState().triggerNavigation('/503');
+        }
+      }
+      return Promise.reject(error);
+    }
+    
+    // We reached the backend (even if it's a 5xx), so the client is technically online
+    useUIStore.getState().setNetworkOffline(false);
+    
+    const status = error.response?.status;
+    
+    // 2. Targeted Retries for Approved Idempotent Infrastructure Endpoints
+    const IDEMPOTENT_ENDPOINTS = ['/health', '/config', '/system'];
+    const isIdempotent = IDEMPOTENT_ENDPOINTS.some(ep => originalRequest.url?.includes(ep));
+    
+    if (status >= 500 && originalRequest.method === 'get' && isIdempotent) {
+      originalRequest._retryCount = originalRequest._retryCount || 0;
+      if (originalRequest._retryCount < 3) {
+        originalRequest._retryCount++;
+        logger.info(`Retrying idempotent request ${originalRequest.url} (Attempt ${originalRequest._retryCount})`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * originalRequest._retryCount));
+        return api(originalRequest);
+      }
+    }
+    
+    // 3. Operational State Navigation for severe backend outages
+    const currentPath = window.location.pathname;
+    if (status === 502 || status === 503) {
+      if (currentPath !== '/503') {
+        useAuthStore.getState().triggerNavigation('/503');
+      }
+      return Promise.reject(error);
+    }
+    if (status === 504) {
+      if (currentPath !== '/504') {
+        useAuthStore.getState().triggerNavigation('/504');
+      }
+      return Promise.reject(error);
+    }
+
+    // 4. Token Refresh Orchestration
     const isAuthEndpoint = originalRequest.url && (
       originalRequest.url.includes('/auth/login') ||
       originalRequest.url.includes('/auth/signup') ||
@@ -57,75 +94,25 @@ api.interceptors.response.use(
       originalRequest.url.includes('/auth/resend-verification')
     );
 
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
-      logger.info('Unauthorized API response detected. Initiating secure refresh mutex...');
-      
-      // If a refresh is already in-flight, subscribe this request to resolved promise
-      if (isRefreshing) {
-        logger.info('Refresh already in flight. Queuing current request...');
-        return new Promise((resolve, reject) => {
-          subscribeTokenRefresh((token) => {
-            if (token) {
-              originalRequest.headers['Authorization'] = `Bearer ${token}`;
-              resolve(api(originalRequest));
-            } else {
-              reject(error);
-            }
-          });
-        });
-      }
-
+    if (status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
-      isRefreshing = true;
+      try {
+        const newToken = await executeTokenRefreshMutex();
+        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshErr) {
+        return Promise.reject(refreshErr);
+      }
+    }
 
-      // Lock single-flight token refresh promise
-      return new Promise((resolve, reject) => {
-        logger.info('Executing single-flight POST /auth/refresh token request...');
-        axios.post(`${config.apiUrl}/auth/refresh`, {}, { 
-          withCredentials: true,
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-          .then((response) => {
-            const payload = response.data.data;
-            if (payload?.accessToken) {
-              logger.info('Token refresh successful. Dispatching new in-memory credentials...');
-              inMemoryAccessToken = payload.accessToken;
-              
-              // Flush wait subscribers with new token
-              onTokenRefreshed(payload.accessToken);
-              
-              // Set headers and retry original request
-              originalRequest.headers['Authorization'] = `Bearer ${payload.accessToken}`;
-              resolve(api(originalRequest));
-            } else {
-              throw new Error('Refresh response missing accessToken');
-            }
-          })
-          .catch((err) => {
-            const status = err?.response?.status;
-            // 400 = no refresh cookie (guest/unauthenticated) — expected, not an error
-            // 401 = invalid/expired token — expected after logout
-            if (status === 400 || status === 401) {
-              logger.info('No active session cookie. User is unauthenticated (guest mode).');
-            } else {
-              logger.error('Token refresh mutex failed. Performing hard logout session eviction...', err);
-            }
-            
-            // Terminate wait queue
-            onTokenRefreshed(null);
-            
-            // Clear credentials
-            inMemoryAccessToken = null;
-            useAuthStore.getState().logout();
-            
-            reject(err);
-          })
-          .finally(() => {
-            isRefreshing = false;
-          });
-      });
+    // 5. In-Page Authorization Rejection (403 Context)
+    if (status === 403) {
+      logger.warn('403 ACTION_FORBIDDEN received. Triggering background permission refresh.');
+      window.dispatchEvent(new CustomEvent('permission_refresh_required'));
     }
 
     return Promise.reject(error);
   }
 );
+
+export default api;

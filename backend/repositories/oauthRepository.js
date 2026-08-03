@@ -1,6 +1,6 @@
 import db from '../db.js';
 
-class OAuthRepository {
+class OAuthRepositoryClass {
   /**
    * Links a new OAuth provider to an existing user.
    */
@@ -59,4 +59,6 @@ class OAuthRepository {
   }
 }
 
-export default new OAuthRepository();
+const instance = new OAuthRepositoryClass();
+export { instance as OAuthRepository };
+export default instance;

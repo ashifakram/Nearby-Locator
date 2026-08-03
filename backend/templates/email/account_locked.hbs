@@ -1,0 +1,14 @@
+<h1>Account Temporarily Locked</h1>
+<p>Hello {{userName}},</p>
+<p>Your {{companyName}} account has been temporarily locked due to multiple consecutive failed sign-in attempts or suspicious activity detection.</p>
+
+<div class="activity-card">
+  <div class="activity-row"><span class="activity-label">Time Locked:</span><span class="activity-val">{{timestamp}}</span></div>
+  <div class="activity-row"><span class="activity-label">Reason:</span><span class="activity-val">{{reason}}</span></div>
+  <div class="activity-row"><span class="activity-label">IP Address:</span><span class="activity-val">{{ipAddress}}</span></div>
+  <div class="activity-row"><span class="activity-label">Location:</span><span class="activity-val">{{location}}</span></div>
+</div>
+
+<div class="security-notice">
+  <strong>How to unlock:</strong> Your account will automatically unlock after the security cooldown period (15 minutes). If you need immediate access or suspect a unauthorized attempt, please initiate a password reset.
+</div>

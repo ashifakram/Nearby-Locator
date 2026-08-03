@@ -42,5 +42,19 @@ export const spotsService = {
     logger.info('Saving spot to private member list...');
     const { data } = await api.post('/discovery/save', { spotId, listName });
     return data;
+  },
+
+  getSavedPlaces: async ({ page, limit }) => {
+    logger.info('Fetching saved places list...');
+    const offset = (page - 1) * limit;
+    const { data } = await api.get('/discovery/saves', { params: { limit, offset } });
+    return data; // returns { success, data, meta }
+  },
+
+  getSearchHistory: async ({ page, limit }) => {
+    logger.info('Fetching search history...');
+    const offset = (page - 1) * limit;
+    const { data } = await api.get('/discovery/history', { params: { limit, offset } });
+    return data;
   }
 };

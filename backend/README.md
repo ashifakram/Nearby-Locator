@@ -30,43 +30,10 @@ Backend API for the Nearby Locator application using Google Places API.
 
 The server will start on `http://localhost:5000`
 
-## API Endpoints
+## API Documentation
 
-### POST /nearby
-Find nearby places based on location and category.
-
-**Request Body:**
-```json
-{
-  "latitude": 28.6139,
-  "longitude": 77.2090,
-  "category": "restaurant",
-  "radius": 2
-}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "results": [
-    {
-      "name": "Place Name",
-      "address": "Address",
-      "rating": 4.5,
-      "map_url": "https://www.google.com/maps/..."
-    }
-  ]
-}
-```
-
-## Available Categories
-- `restaurant` - Restaurants
-- `hospital` - Hospitals
-- `medical` - Medical Shops/Pharmacies
-- `pharmacy` - Pharmacies
-- `gas_station` - Petrol Pumps
-- `atm` - ATMs
+This project uses OpenAPI/Swagger for API documentation. 
+When running locally, documentation is available at `http://localhost:5000/api-docs/v1`.
 
 ## Security Note
 ⚠️ Never commit your `.env` file to Git. The `.gitignore` file is configured to exclude it.

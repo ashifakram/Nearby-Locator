@@ -1,0 +1,45 @@
+
+Live:
+  get:
+    operationId: getLive
+    tags: [Health]
+    summary: Liveness check
+    responses:
+      '200':
+        description: Success
+
+Ready:
+  get:
+    operationId: getReady
+    tags: [Health]
+    summary: Readiness check
+    responses:
+      '200':
+        description: Success
+
+Db:
+  get:
+    operationId: getDbHealth
+    tags: [Health]
+    summary: Database health
+    responses:
+      '200':
+        description: Success
+
+Redis:
+  get:
+    operationId: getRedisHealth
+    tags: [Health]
+    summary: Redis health
+    responses:
+      '200':
+        description: Success
+
+Metrics:
+  get:
+    operationId: getAppMetrics
+    tags: [Health]
+    summary: App metrics
+    responses:
+      '200':
+        description: Success

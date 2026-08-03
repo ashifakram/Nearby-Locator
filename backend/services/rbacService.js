@@ -27,7 +27,11 @@ export const RbacService = {
   _validatePriorityBoundary(actorRole, targetRole) {
     if (actorRole.priority === 100 && targetRole.priority === 100) return true; // Super Admins can manage Super Admins
     if (actorRole.priority <= targetRole.priority) {
-      throw new Error('Privilege Boundary Violation: Cannot perform actions on a user with equal or higher role priority.');
+      const err = new Error('Privilege Boundary Violation: Cannot perform actions on a user with equal or higher role priority.');
+      err.status = 403;
+      err.code = 'FORBIDDEN';
+      err.isOperational = true;
+      throw err;
     }
     return true;
   },

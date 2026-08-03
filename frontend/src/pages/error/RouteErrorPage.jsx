@@ -1,26 +1,44 @@
 import React from 'react';
 import { useRouteError } from 'react-router-dom';
+import AuthCard from '../../components/auth/AuthCard';
+import StatusCard from '../../components/auth/StatusCard';
 import { logger } from '../../utils/logger';
 
+/**
+ * RouteErrorPage
+ * React Router v6 errorElement — catches route-level errors thrown during lazy load,
+ * loader failures, or render-phase crashes within a router segment.
+ */
 export default function RouteErrorPage() {
   const error = useRouteError();
-  logger.error('Fatal route crash captured by RouteErrorPage:', error);
+  logger.error('[RouteErrorPage] Fatal route crash:', error);
+
+  const isDev = import.meta.env.DEV;
+  const errorMessage = error?.message || error?.statusText || String(error);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white text-center">
-      <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-        <span className="text-5xl block mb-4">⚠️</span>
-        <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
-        <p className="text-gray-400 text-sm mb-6 leading-relaxed">
-          The application encountered a non-catastrophic rendering failure. You can reload the page to restore normal operation.
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="w-full py-3 rounded-2xl font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg transition-all duration-200 hover:scale-[1.02]"
-        >
-          Reload Application
-        </button>
-      </div>
-    </div>
+    <AuthCard>
+      <StatusCard
+        type="error"
+        title="Routing Error"
+        description="A fatal error occurred while loading this page. This may be caused by a failed code chunk or an unhandled exception."
+        details={
+          <div className="space-y-2">
+            {isDev && (
+              <div className="font-mono text-xs text-rose-700 bg-rose-50/80 border border-rose-200/60 rounded-xl p-3 break-all max-h-28 overflow-y-auto">
+                <strong>DEV:</strong> {errorMessage}
+              </div>
+            )}
+            <p className="text-slate-600">
+              Reloading the page usually resolves this. If the error persists, try clearing your browser cache.
+            </p>
+          </div>
+        }
+        primaryActionLabel="Reload Page"
+        onPrimaryAction={() => window.location.reload()}
+        secondaryActionLabel="Return to Home"
+        secondaryActionTo="/"
+      />
+    </AuthCard>
   );
 }

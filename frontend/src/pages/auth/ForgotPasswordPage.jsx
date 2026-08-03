@@ -1,20 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Mail, KeyRound, ArrowRight } from 'lucide-react';
 import { authService } from '../../services/auth';
 import { useToastStore } from '../../store/useToastStore';
 import { normalizeError } from '../../utils/errors';
-import LoaderIcon from '../../icons/LoaderIcon';
+import {
+  AuthCard,
+  AuthPageTitle,
+  AuthFooter,
+  AuthLink,
+  AuthSubmitButton,
+  AuthFloatingInput,
+} from '../../components/auth/AuthComponents';
 
 const forgotSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Invalid email address'),
 });
 
 export default function ForgotPasswordPage() {
+  const navigate = useNavigate();
   const { showToast } = useToastStore();
-  const [submitted, setSubmitted] = React.useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const abortControllerRef = useRef(null);
 
   const {
     register,
@@ -25,92 +35,82 @@ export default function ForgotPasswordPage() {
     defaultValues: { email: '' },
   });
 
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, []);
+
   const onSubmit = async (data) => {
+    if (submitted) return;
+    abortControllerRef.current = new AbortController();
+
     try {
-      await authService.requestPasswordReset(data.email);
-      setSubmitted(true);
+      await authService.requestPasswordReset(data.email, abortControllerRef.current.signal);
     } catch (err) {
-      const friendlyErr = normalizeError(err);
-      showToast(friendlyErr, 'error');
+      if (err.name === 'CanceledError') return;
+      const code = err.code;
+
+      if (code === 'ACCOUNT_NOT_VERIFIED') {
+        showToast(
+          "Your account hasn't been verified yet. We've sent you a new verification code.",
+          'info'
+        );
+        navigate('/verify-email', {
+          state: {
+            email: data.email,
+            message: 'A new verification code has been sent to your inbox.',
+          },
+        });
+        return;
+      }
+
+      // Absorb identity-related errors silently to prevent user enumeration
+      if (!code) {
+        showToast(normalizeError(err), 'error');
+        return;
+      }
     }
+
+    // Unconditional success flow to prevent user enumeration
+    showToast('If the account exists, a 6-digit reset OTP has been sent.', 'success');
+    setSubmitted(true);
+    navigate('/reset-password', { state: { email: data.email } });
   };
 
-  if (submitted) {
-    return (
-      <div className="text-center space-y-6">
-        <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto ring-4 ring-emerald-500/10">
-          <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h2 className="text-3xl font-extrabold tracking-tight text-white">Check Your Inbox</h2>
-        <p className="text-slate-400 max-w-sm mx-auto text-sm leading-relaxed">
-          If an account exists for that email, we've sent a password reset link. Please check your spam folder if you don't see it.
-        </p>
-        <Link
-          to="/login"
-          className="inline-block px-6 py-3 w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all font-semibold border border-slate-700"
-        >
-          Return to Login
-        </Link>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-3xl font-extrabold tracking-tight text-white">Reset Password</h2>
-        <p className="text-sm text-slate-400 mt-2">Enter your email to receive a reset link</p>
-      </div>
+    <>
+      <AuthCard>
+        <AuthPageTitle
+          title="Reset Your Password"
+          icon={KeyRound}
+          subtitle="Enter your account email to receive a 6-digit verification code."
+        />
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Email Field */}
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-semibold text-slate-300">Email Address</label>
-          <input
-            {...register('email')}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <AuthFloatingInput
+            id="email"
+            label="Email address"
             type="email"
-            placeholder="name@example.com"
-            disabled={isSubmitting}
-            className={`w-full bg-slate-900/50 border ${
-              errors.email ? 'border-red-500' : 'border-slate-800 focus:border-cyan-500'
-            } rounded-xl px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all`}
+            placeholder="you@example.com"
+            autoComplete="email"
+            leftIcon={Mail}
+            error={errors.email?.message}
+            disabled={isSubmitting || submitted}
+            {...register('email')}
           />
-          {errors.email && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.email.message}</p>
-          )}
-        </div>
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full relative group overflow-hidden rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed border border-cyan-500/50 shadow-[0_0_20px_-5px_rgba(8,179,197,0.4)]"
-        >
-          <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-          <span className="flex items-center justify-center gap-2 relative z-10">
-            {isSubmitting ? (
-              <>
-                <LoaderIcon className="animate-spin" width={18} height={18} color="#fff" />
-                Sending Link...
-              </>
-            ) : (
-              'Send Reset Link'
-            )}
-          </span>
-        </button>
-      </form>
+          <AuthSubmitButton isLoading={isSubmitting} loadingLabel="Sending code…" disabled={submitted}>
+            <span>Send Reset Code</span>
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+          </AuthSubmitButton>
+        </form>
+      </AuthCard>
 
-      {/* Back to login */}
-      <div className="text-center mt-6">
-        <p className="text-sm text-slate-400">
-          Remember your password?{' '}
-          <Link to="/login" className="font-bold text-cyan-400 hover:text-cyan-300 transition-colors">
-            Log In
-          </Link>
-        </p>
-      </div>
-    </div>
+      <AuthFooter>
+        Remember your password?{' '}
+        <AuthLink onClick={() => navigate('/login')}>Sign In</AuthLink>
+      </AuthFooter>
+    </>
   );
 }

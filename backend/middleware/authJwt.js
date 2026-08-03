@@ -72,6 +72,7 @@ export const authJwt = async (req, res, next) => {
     // Explicitly block impersonated sessions from high-risk security/account changes
     if (payload.scope === 'impersonation') {
       const blockedPaths = [
+        '/api/auth/password/change',
         '/api/auth/password/reset',
         '/api/auth/google/delink',
         '/api/auth/logout-all',
@@ -106,18 +107,39 @@ export const authJwt = async (req, res, next) => {
     }
     
     if (sessionCache === null) {
-      // Cache miss or Redis outage: Verify active session status directly in PostgreSQL database
-      const session = await db('user_sessions')
-        .where({ id: sessionId, is_revoked: false, is_rotated: false })
-        .first();
-        
-      if (!session) {
-        return sendError(res, { code: 'REVOKED_SESSION' }, 'Session has been revoked or expired', 401);
-      }
+      if (payload.scope === 'impersonation') {
+        const userRecord = await db('users')
+          .leftJoin('user_roles', 'users.id', '=', 'user_roles.user_id')
+          .leftJoin('roles', 'user_roles.role_id', '=', 'roles.id')
+          .select('users.email', 'users.status', 'roles.name as role')
+          .where('users.id', userId)
+          .first();
+
+        if (!userRecord) {
+          return sendError(res, { code: 'REVOKED_SESSION' }, 'User not found', 401);
+        }
+
+        sessionCache = {
+          userId,
+          email: userRecord.email,
+          role: userRecord.role || 'user',
+          isSuspended: userRecord.status === 'BANNED' || userRecord.status === 'DISABLED',
+          sudoUntil: null
+        };
+      } else {
+        // Cache miss or Redis outage: Verify active session status directly in PostgreSQL database
+        const session = await db('user_sessions')
+          .where({ id: sessionId, is_revoked: false, is_rotated: false })
+          .first();
+          
+        if (!session) {
+          return sendError(res, { code: 'REVOKED_SESSION' }, 'Session has been revoked or expired', 401);
+        }
 
       // Fetch user role, email, status for metadata
       const userRecord = await db('users')
-        .join('roles', 'users.role_id', '=', 'roles.id')
+        .leftJoin('user_roles', 'users.id', '=', 'user_roles.user_id')
+        .leftJoin('roles', 'user_roles.role_id', '=', 'roles.id')
         .select('users.email', 'users.status', 'roles.name as role')
         .where('users.id', userId)
         .first();
@@ -136,11 +158,12 @@ export const authJwt = async (req, res, next) => {
         sudoUntil: null
       };
       
-      // Cache the metadata back in Redis for 15 minutes
-      try {
-        await client.set(cacheKey, JSON.stringify(sessionCache), { EX: 15 * 60 });
-      } catch (redisErr) {
-        dbLogger.error('Failed to update active session cache back in Redis', redisErr);
+        // Cache the metadata back in Redis for 15 minutes
+        try {
+          await client.set(cacheKey, JSON.stringify(sessionCache), { EX: 15 * 60 });
+        } catch (redisErr) {
+          dbLogger.error('Failed to update active session cache back in Redis', redisErr);
+        }
       }
     }
     
@@ -164,7 +187,7 @@ export const authJwt = async (req, res, next) => {
     // Impersonation JWT Verification and Session-Invalidation Checks
     if (payload.scope === 'impersonation') {
       const impersonatorId = payload.impersonator_id;
-      const impersonatorSid = payload.sid;
+      const impersonatorSid = payload.impersonator_sid || payload.sid;
 
       if (!impersonatorId || !impersonatorSid) {
         return sendError(res, { code: 'INVALID_TOKEN' }, 'Invalid impersonation token claims', 401);
@@ -189,7 +212,8 @@ export const authJwt = async (req, res, next) => {
         }
 
         const adminRecord = await db('users')
-          .join('roles', 'users.role_id', '=', 'roles.id')
+          .leftJoin('user_roles', 'users.id', '=', 'user_roles.user_id')
+          .leftJoin('roles', 'user_roles.role_id', '=', 'roles.id')
           .select('users.email', 'users.status', 'roles.name as role')
           .where('users.id', impersonatorId)
           .first();
@@ -215,8 +239,10 @@ export const authJwt = async (req, res, next) => {
         return sendError(res, { code: 'REVOKED_SESSION' }, 'Impersonation actor has been suspended', 401);
       }
 
-      // Verify role is qualified
-      if (adminCache.role !== 'support_lead' && adminCache.role !== 'super_admin') {
+      // Verify impersonator has impersonation privileges via PermissionService
+      const { PermissionService } = await import('../services/permissionService.js');
+      const { permissions } = await PermissionService.getUserPermissions(impersonatorId);
+      if (!permissions.includes('admin.impersonate') && !permissions.includes('admin.access')) {
         return sendError(res, { code: 'FORBIDDEN' }, 'Actor does not possess impersonation privileges', 403);
       }
 

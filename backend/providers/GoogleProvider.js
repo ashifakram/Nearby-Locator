@@ -5,14 +5,24 @@ export default class GoogleProvider extends OAuthProvider {
   constructor() {
     super();
     this.clientId = process.env.GOOGLE_CLIENT_ID || 'dummy-client-id-for-tests';
-    this.client = new OAuth2Client(this.clientId);
+    this.clientSecret = process.env.GOOGLE_CLIENT_SECRET || null;
+    this.client = new OAuth2Client(
+      this.clientId,
+      this.clientSecret,
+      'postmessage' // Required for popup/code flow from browser
+    );
   }
 
   get name() {
     return 'google';
   }
 
-  async verifyAndNormalize(tokenOrCode) {
+  /**
+   * Accepts either:
+   *   - An ID token string (legacy GSI credential flow)
+   *   - An authorization code string (new popup OAuth2 code flow)
+   */
+  async verifyAndNormalize(tokenOrCode, isAuthCode = false) {
     if (!tokenOrCode || typeof tokenOrCode !== 'string') {
       const err = new Error('Google token must be a string');
       err.code = 'INVALID_INPUT';
@@ -20,17 +30,40 @@ export default class GoogleProvider extends OAuthProvider {
     }
 
     let payload;
-    try {
-      // Cryptographically verifies the signature, issuer, audience, and expiration
-      const ticket = await this.client.verifyIdToken({
-        idToken: tokenOrCode,
-        audience: this.clientId
-      });
-      payload = ticket.getPayload();
-    } catch (e) {
-      const err = new Error('Google token verification failed: ' + e.message);
-      err.code = 'INVALID_TOKEN';
-      throw err;
+
+    if (isAuthCode) {
+      // --- Auth Code Flow (from initCodeClient popup) ---
+      // Exchange the code for tokens, then extract the ID token payload
+      try {
+        const { tokens } = await this.client.getToken(tokenOrCode);
+        if (!tokens.id_token) {
+          const err = new Error('Google auth code exchange did not return an ID token');
+          err.code = 'INVALID_TOKEN';
+          throw err;
+        }
+        const ticket = await this.client.verifyIdToken({
+          idToken: tokens.id_token,
+          audience: this.clientId,
+        });
+        payload = ticket.getPayload();
+      } catch (e) {
+        const err = new Error('Google auth code exchange failed: ' + e.message);
+        err.code = 'INVALID_TOKEN';
+        throw err;
+      }
+    } else {
+      // --- ID Token Flow (legacy GSI credential / One Tap) ---
+      try {
+        const ticket = await this.client.verifyIdToken({
+          idToken: tokenOrCode,
+          audience: this.clientId,
+        });
+        payload = ticket.getPayload();
+      } catch (e) {
+        const err = new Error('Google token verification failed: ' + e.message);
+        err.code = 'INVALID_TOKEN';
+        throw err;
+      }
     }
 
     if (!payload || !payload.email) {
@@ -48,8 +81,8 @@ export default class GoogleProvider extends OAuthProvider {
       metadata: {
         hd: payload.hd || null,
         picture: payload.picture || null,
-        locale: payload.locale || 'en'
-      }
+        locale: payload.locale || 'en',
+      },
     };
   }
 }

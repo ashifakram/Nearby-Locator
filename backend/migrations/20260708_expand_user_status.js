@@ -16,7 +16,10 @@ export async function up(knex) {
     END
   `);
 
-  // 3. Add the expanded check constraint enforcing the canonical catalog
+  // 3. Set default column value to uppercase 'ACTIVE' to match constraint
+  await knex.raw("ALTER TABLE users ALTER COLUMN status SET DEFAULT 'ACTIVE'");
+
+  // 4. Add the expanded check constraint enforcing the canonical catalog
   await knex.raw(`
     ALTER TABLE users 
     ADD CONSTRAINT users_status_check 

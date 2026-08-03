@@ -44,6 +44,7 @@ const warningCaps = new Map();
 const checkWarningThrottled = (categoryCode) => { return false; }; // Simplified for now
 export const closeWarningTimers = () => {};
 export const clearWarningCaps = () => {};
+export const metricsStore = {};
 
 export const logger = {
   info(message, meta = {}, category = 'APP') {

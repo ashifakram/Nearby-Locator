@@ -42,10 +42,23 @@ GOOGLE_CLIENT_SECRET=test_google_client_secret_placeholder
 
   // 3. Bind environment parameters before module imports execute
   process.env.NODE_ENV = 'test';
+  process.env.MOCK_REDIS = 'true';
 
-  // 4. Force latest knex migrations against the test database
-  console.log('🗄️  Running Knex database migrations on nearby_locator_test...');
+  // 4. Force latest knex migrations against the test database from a pristine schema
+  console.log('🗄️  Resetting and running Knex database migrations on nearby_locator_test...');
   const { default: db } = await import('../db.js');
+  
+  // Safety Guard: Protect against accidental schema drop on non-test DBs
+  const dbUrl = db.client.config.connection?.connectionString || '';
+  if (process.env.NODE_ENV !== 'test' || !dbUrl.includes('_test')) {
+    throw new Error(
+      `[CRITICAL ENVIRONMENT SAFETY VIOLATION] Refusing to drop schema! ` +
+      `Schema reset can only execute when process.env.NODE_ENV === 'test' and database URL contains '_test'. ` +
+      `Target DB URL: "${dbUrl}"`
+    );
+  }
+
+  await db.raw('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await db.migrate.latest();
   console.log('✅ Schema migrated cleanly.');
 
@@ -56,6 +69,7 @@ GOOGLE_CLIENT_SECRET=test_google_client_secret_placeholder
   const testProcess = spawn('node', [
     '--test',
     '--test-concurrency=1',
+    'test/queryUtils.test.js',
     'test/auth.test.js',
     'test/failures.test.js',
     'test/observability.test.js',
@@ -68,6 +82,9 @@ GOOGLE_CLIENT_SECRET=test_google_client_secret_placeholder
     'test/discovery.test.js',
     'test/moderation.test.js',
     'test/searchQuality.test.js',
+    'test/accountManagement.test.js',
+    'test/adminUserManagement.test.js',
+    'test/adminPlatform.test.js'
   ], {
     stdio: 'inherit',
     env: { ...process.env, NODE_ENV: 'test', FORCE_LOGGING: 'true' }

@@ -2,11 +2,13 @@ import express from 'express';
 import { searchSpots, getClusteredMap, createSpot } from '../controllers/spotController.js';
 import { geoRateLimiter } from '../middleware/geoRateLimiter.js';
 import { geoCacheMiddleware } from '../middleware/geoCache.js';
+import { requirePermission } from '../middleware/requirePermission.js';
+import { authJwt } from '../middleware/authJwt.js';
 
 const router = express.Router();
 
 // 1. Create a new spot location (Supports test seeding)
-router.post('/', createSpot);
+router.post('/', authJwt, requirePermission('spots.create'), createSpot);
 
 // 2. High-performance stable nearby search (Coordinates rate-limited & first-page snapped-cached)
 router.get('/search', geoRateLimiter(10, 60), geoCacheMiddleware(), searchSpots);

@@ -28,14 +28,16 @@ describe('🛡️ Platform Trust, Safety, & Moderation Infrastructure Suite', ()
   // Helper: create a user with a hashed password
   const createUser = async (email, role = 'user', trustScore = 0.5) => {
     const password_hash = await bcrypt.hash('SecurePassword123!', 10);
+    const roleRecord = await db('roles').where({ name: role }).first();
     const [user] = await db('users').insert({
       email,
       password_hash,
-      role,
       trust_score: trustScore,
       created_at: db.fn.now(),
-      updated_at: db.fn.now()
-    }).returning('*');
+      status: 'VERIFIED'
+    })
+    .returning('*');
+    await db('user_roles').insert({ user_id: user.id, role_id: roleRecord.id });
     return user;
   };
 

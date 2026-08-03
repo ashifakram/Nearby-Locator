@@ -184,12 +184,8 @@ Then create the `.env` file as shown above.
 
 ### Backend Connection Issues
 ✅ **Solutions:**
-- Update backend URL in `src/App.js` to use your local IP:
-  ```javascript
-  const response = await fetch("http://YOUR_LOCAL_IP:5000/nearby", {
-  ```
+- Update backend URL in `src/app/config.js` or `.env` if necessary.
 - Ensure backend is running and accessible from network
-- Check backend CORS settings allow your IP
 
 ---
 

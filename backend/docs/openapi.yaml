@@ -4,6 +4,7 @@ info:
   version: 1.0.0
   license:
     name: Proprietary
+    url: 'https://example.com/license'
   description: |
     # Authentication Lifecycle
     1. **Signup:** User registers (`POST /auth/signup`). Status becomes `PENDING_VERIFICATION`.
@@ -42,6 +43,24 @@ paths:
     $ref: './paths/auth.yaml#/PasswordChange'
   /users/profile:
     $ref: './paths/users.yaml#/Profile'
+  /users/profile/avatar:
+    $ref: './paths/users.yaml#/Avatar'
+  /users/account/change-email:
+    $ref: './paths/users.yaml#/ChangeEmail'
+  /users/account/verify-email-change:
+    $ref: './paths/users.yaml#/VerifyEmailChange'
+  /users/preferences:
+    $ref: './paths/users.yaml#/Preferences'
+  /users/privacy:
+    $ref: './paths/users.yaml#/Privacy'
+  /users/notifications/settings:
+    $ref: './paths/users.yaml#/NotificationSettings'
+  /users/account/export:
+    $ref: './paths/users.yaml#/ExportAccount'
+  /users/account/export/{exportId}:
+    $ref: './paths/users.yaml#/ExportStatus'
+  /users/account/export/download/{token}:
+    $ref: './paths/users.yaml#/ExportDownload'
   /users/me/devices:
     $ref: './paths/users.yaml#/Devices'
   /users/me/devices/{sessionId}:
@@ -52,6 +71,126 @@ paths:
     $ref: './paths/admin.yaml#/Roles'
   /admin/permissions:
     $ref: './paths/admin.yaml#/Permissions'
+
+  /admin/sudo-confirm:
+    $ref: './paths/admin.yaml#/SudoConfirm'
+  /admin/dashboard/widgets:
+    $ref: './paths/admin.yaml#/DashboardWidgets'
+  /admin/ops/queues:
+    $ref: './paths/admin.yaml#/QueueOps'
+  /admin/ops/health/infrastructure:
+    $ref: './paths/admin.yaml#/InfrastructureHealth'
+  /admin/feature-flags:
+    $ref: './paths/admin.yaml#/FeatureFlags'
+  /admin/users:
+    $ref: './paths/admin.yaml#/Users'
+  /admin/users/{userId}/suspend:
+    $ref: './paths/admin.yaml#/SuspendUser'
+  /admin/users/{userId}/unlock:
+    $ref: './paths/admin.yaml#/UnlockUser'
+  /admin/users/{userId}/logout:
+    $ref: './paths/admin.yaml#/LogoutUser'
+  /admin/roles/{roleId}/permissions:
+    $ref: './paths/admin.yaml#/UpdateRolePermissions'
+  /admin/users/{userId}/role:
+    $ref: './paths/admin.yaml#/EscalateRole'
+  /admin/impersonate:
+    $ref: './paths/admin.yaml#/Impersonate'
+  /admin/export-data:
+    $ref: './paths/admin.yaml#/ExportData'
+  /admin/export-status/{exportId}:
+    $ref: './paths/admin.yaml#/ExportStatus'
+  /admin/downloads/{token}:
+    $ref: './paths/admin.yaml#/Downloads'
+  /admin/retention-override:
+    $ref: './paths/admin.yaml#/RetentionOverride'
+  /admin/audit-logs:
+    $ref: './paths/admin.yaml#/AuditLogs'
+  /admin/control-plane-metrics:
+    $ref: './paths/admin.yaml#/ControlPlaneMetrics'
+  /admin/auth-events:
+    $ref: './paths/admin.yaml#/AuthEvents'
+  /admin/system-errors:
+    $ref: './paths/admin.yaml#/SystemErrors'
+  /admin/sessions:
+    $ref: './paths/admin.yaml#/Sessions'
+  /admin/sessions/{id}:
+    $ref: './paths/admin.yaml#/RevokeSession'
+  /admin/sessions/user/{userId}:
+    $ref: './paths/admin.yaml#/RevokeUserSessions'
+  /admin/analytics/dashboard:
+    $ref: './paths/admin.yaml#/AnalyticsDashboard'
+  /admin/analytics/auth-events:
+    $ref: './paths/admin.yaml#/AnalyticsAuthEvents'
+  /admin/analytics/system-errors:
+    $ref: './paths/admin.yaml#/AnalyticsSystemErrors'
+  /admin/analytics/audit-logs:
+    $ref: './paths/admin.yaml#/AnalyticsAuditLogs'
+  /discovery/search:
+    $ref: './paths/discovery.yaml#/Search'
+  /discovery/click:
+    $ref: './paths/discovery.yaml#/Click'
+  /discovery/save:
+    $ref: './paths/discovery.yaml#/Save'
+  /discovery/saves:
+    $ref: './paths/discovery.yaml#/Saves'
+  /discovery/history:
+    $ref: './paths/discovery.yaml#/History'
+  /discovery/telemetry:
+    $ref: './paths/discovery.yaml#/Telemetry'
+  /discovery/autocomplete:
+    $ref: './paths/discovery.yaml#/Autocomplete'
+  /health/live:
+    $ref: './paths/health.yaml#/Live'
+  /health/ready:
+    $ref: './paths/health.yaml#/Ready'
+  /health/db:
+    $ref: './paths/health.yaml#/Db'
+  /health/redis:
+    $ref: './paths/health.yaml#/Redis'
+  /health/metrics:
+    $ref: './paths/health.yaml#/Metrics'
+  /moderation/reports:
+    $ref: './paths/moderation.yaml#/Reports'
+  /moderation/appeals:
+    $ref: './paths/moderation.yaml#/Appeals'
+  /moderation/admin/queue:
+    $ref: './paths/moderation.yaml#/AdminQueue'
+  /moderation/admin/reports:
+    $ref: './paths/moderation.yaml#/AdminReports'
+  /moderation/admin/appeals:
+    $ref: './paths/moderation.yaml#/AdminAppeals'
+  /moderation/admin/reports/{reportId}/resolve:
+    $ref: './paths/moderation.yaml#/AdminResolveReport'
+  /moderation/admin/spots/{spotId}/action:
+    $ref: './paths/moderation.yaml#/AdminActionSpot'
+  /moderation/admin/appeals/{appealId}/resolve:
+    $ref: './paths/moderation.yaml#/AdminResolveAppeal'
+  /notifications/preferences:
+    $ref: './paths/notifications.yaml#/Preferences'
+  /notifications/test:
+    $ref: './paths/notifications.yaml#/Test'
+  /notifications/webhooks/subscriptions:
+    $ref: './paths/notifications.yaml#/WebhookSubscriptions'
+  /notifications/providers/webhooks:
+    $ref: './paths/notifications.yaml#/ProvidersWebhooks'
+  /notifications/telemetry:
+    $ref: './paths/notifications.yaml#/Telemetry'
+  /notifications/password-reset-trigger:
+    $ref: './paths/notifications.yaml#/PasswordResetTrigger'
+  /spots/:
+    $ref: './paths/spots.yaml#/CreateSpot'
+  /spots/search:
+    $ref: './paths/spots.yaml#/SearchSpots'
+  /spots/clusters:
+    $ref: './paths/spots.yaml#/Clusters'
+  /auth/sessions:
+    $ref: './paths/auth.yaml#/SessionsGet'
+  /auth/providers/{providerName}:
+    $ref: './paths/auth.yaml#/ProviderDelete'
+  /users/delete:
+    $ref: './paths/users.yaml#/DeleteUser'
+
 components:
   securitySchemes:
     $ref: './components/securitySchemes.yaml'

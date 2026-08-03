@@ -1,0 +1,15 @@
+<h1>New Login Detected</h1>
+<p>Hello {{userName}},</p>
+<p>We detected a new sign-in to your {{companyName}} account from an unrecognized device or location.</p>
+
+<div class="activity-card">
+  <div class="activity-row"><span class="activity-label">Time:</span><span class="activity-val">{{timestamp}}</span></div>
+  <div class="activity-row"><span class="activity-label">Browser:</span><span class="activity-val">{{browser}}</span></div>
+  <div class="activity-row"><span class="activity-label">Operating System:</span><span class="activity-val">{{os}}</span></div>
+  <div class="activity-row"><span class="activity-label">Approximate Location:</span><span class="activity-val">{{location}}</span></div>
+  <div class="activity-row"><span class="activity-label">IP Address:</span><span class="activity-val">{{ipAddress}}</span></div>
+</div>
+
+<div class="security-notice">
+  <strong>Was this you?</strong> If you recognize this login, no action is needed. If you did not log in at this time, please change your password immediately and sign out of all active sessions.
+</div>

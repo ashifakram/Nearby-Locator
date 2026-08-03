@@ -17,6 +17,9 @@ import {
   sendNotificationJob,
   sendWebhookJob
 } from './notificationJobs.js';
+import {
+  generateAccountExportJob
+} from './accountJobs.js';
 
 /**
  * Registry mapping job types to their execution handler functions.
@@ -35,6 +38,8 @@ export const jobRegistry = {
   CLEANUP_AND_ROLLUP_ANALYTICS:  runDailyAnalyticsRollup,
   // Administrative tasks
   EXPORT_USER_DATA:              exportUserDataJob,
+  // Account management async jobs
+  GENERATE_ACCOUNT_EXPORT:       generateAccountExportJob,
   // Notification & Webhook delivery channels
   SEND_NOTIFICATION:             sendNotificationJob,
   SEND_WEBHOOK:                  sendWebhookJob,

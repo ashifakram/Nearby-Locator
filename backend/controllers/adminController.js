@@ -6,13 +6,19 @@ import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
 import { sendError, sendSuccess } from '../middleware/responseFormatter.js';
 import { logAudit } from '../utils/auditLogger.js';
+import { CsvBuilder } from '../utils/csvExport.js';
 import { enqueue } from '../utils/queue.js';
 import { dbLogger } from '../utils/dbLogger.js';
 import { RbacService } from '../services/rbacService.js';
+import { RbacRepository } from '../repositories/rbacRepository.js';
+import { AuthenticationRepository } from '../repositories/authenticationRepository.js';
+import { SystemErrorRepository } from '../repositories/systemErrorRepository.js';
 import { RbacCache } from '../services/rbacCache.js';
 import { SessionService } from '../services/sessionService.js';
 import { IdentityService } from '../services/identityService.js';
 import { withTransaction } from '../utils/dbRetry.js';
+import analyticsService from '../services/analyticsService.js';
+import { buildSortClause, buildPaginationClause, applyDateRange } from '../utils/queryUtils.js';
 
 const BREAK_GLASS_STARTUP_TIME = Date.now();
 
@@ -109,6 +115,12 @@ export const suspendUser = async (req, res, next) => {
       await SessionService.revokeAllSessionsForUser(userId, executor);
     });
 
+    // Evict active session cache in Redis for immediate propagation
+    const userSessions = await db('user_sessions').where({ user_id: userId }).select('id');
+    for (const s of userSessions) {
+      await client.del(`session:active:${s.id}`).catch(() => {});
+    }
+
     await logAudit({
       req,
       actorId: req.user.id,
@@ -192,12 +204,23 @@ export const forceLogout = async (req, res, next) => {
  */
 export const escalateRole = async (req, res, next) => {
   try {
-    const { userId, requestedRoleId } = req.body;
-    if (!userId || !requestedRoleId) {
-      return sendError(res, { code: 'INVALID_INPUT' }, 'Target user ID and requested role ID are required', 400);
+    let { userId, requestedRoleId, requestedRole, roleId } = req.body;
+    let targetRoleId = requestedRoleId || roleId || requestedRole;
+
+    if (!userId || !targetRoleId) {
+      return sendError(res, { code: 'INVALID_INPUT' }, 'Target user ID and requested role ID or name are required', 400);
     }
 
-    await RbacService.assignUserRole(req.user.id, userId, requestedRoleId);
+    if (typeof targetRoleId === 'string' && !targetRoleId.includes('-')) {
+      const roleNameMap = { 'super_admin': 'Super Admin', 'admin': 'Admin', 'user': 'User', 'support_agent': 'User', 'support_lead': 'Admin' };
+      const mappedName = roleNameMap[targetRoleId] || targetRoleId;
+      const roleRecord = await db('roles').whereILike('name', mappedName).first();
+      if (roleRecord) {
+        targetRoleId = roleRecord.id;
+      }
+    }
+
+    await RbacService.assignUserRole(req.user.id, userId, targetRoleId);
     await RbacCache.invalidateUserCache(userId);
     
     // Evict sessions to force active update propagation immediately
@@ -211,10 +234,10 @@ export const escalateRole = async (req, res, next) => {
       targetUserId: userId,
       action: 'USER_ROLE_CHANGED',
       severity: 'CRITICAL',
-      metadata: { requestedRoleId }
+      metadata: { targetRoleId }
     });
 
-    return sendSuccess(res, { newRoleId: requestedRoleId }, 'User role successfully updated');
+    return sendSuccess(res, null, 'User role escalated successfully');
   } catch (err) {
     next(err);
   }
@@ -275,36 +298,45 @@ export const initiateImpersonation = async (req, res, next) => {
       return sendError(res, { code: 'NOT_FOUND' }, 'Target user not found', 404);
     }
 
-    const operatorWeight = ROLE_WEIGHTS[req.user.role] || 0;
-    const targetWeight = ROLE_WEIGHTS[targetUser.role] || 0;
+    const actorRole = await RbacRepository.getUserRole(req.user.id);
+    const targetRole = await RbacRepository.getUserRole(targetUserId);
 
-    if (operatorWeight <= targetWeight) {
-      return sendError(res, { code: 'FORBIDDEN' }, 'Cannot impersonate equal-or-higher role user', 403);
+    if (actorRole && targetRole) {
+      RbacService._validatePriorityBoundary(actorRole, targetRole);
     }
 
     // Issue standard, non-refreshable, 5-minute token with impersonation scope
+    const impersonationSessionId = crypto.randomUUID();
     const impersonationPayload = {
       sub: targetUserId,
       impersonator_id: req.user.id,
-      sid: req.user.sessionId,
+      impersonator_sid: req.user.sessionId,
+      sid: impersonationSessionId,
       scope: 'impersonation'
     };
 
     const token = jwt.sign(impersonationPayload, config.auth.jwtSecret, { expiresIn: '5m' });
 
-    // Set impersonation indicator key in Redis
-    await client.set(`impersonation:active:${targetUserId}`, req.user.id, { EX: 300 });
+    // Store target user session metadata in Redis for impersonation token lookup
+    const impersonationCache = {
+      userId: targetUserId,
+      email: targetUser.email,
+      role: targetRole ? targetRole.name : 'user',
+      isSuspended: targetUser.status === 'BANNED' || targetUser.status === 'DISABLED',
+      sudoUntil: null
+    };
+    await client.set(`session:active:${impersonationSessionId}`, JSON.stringify(impersonationCache), { EX: 300 });
 
     await logAudit({
       req,
       actorId: req.user.id,
-      targetUserId,
-      action: 'IMPERSONATION_INITIATED',
-      severity: 'WARNING',
+      targetUserId: targetUserId,
+      action: 'IMPERSONATION_STARTED',
+      severity: 'CRITICAL',
       metadata: { impersonated: true }
     });
 
-    return sendSuccess(res, { token }, 'Impersonation session established');
+    return sendSuccess(res, { token }, 'Impersonation token issued');
   } catch (err) {
     next(err);
   }
@@ -450,12 +482,74 @@ export const retentionOverride = async (req, res, next) => {
 };
 
 /**
+ * 9. GET /api/admin/users
+ * Paginated list of users for administration.
+ */
+export const getUsers = async (req, res, next) => {
+  try {
+    const { limit = 50, page = 1, search } = req.query;
+
+    const { limit: parsedLimit, offset, page: parsedPage } = buildPaginationClause(req.query, 50, 100);
+    const { column, order } = buildSortClause(req.query, 'created_at', 'desc', ['created_at', 'name', 'email', 'status', 'role_id']);
+
+    const query = db('users');
+
+    if (search) {
+      query.where(builder => {
+        builder.where('email', 'ILIKE', `%${search}%`)
+               .orWhere('name', 'ILIKE', `%${search}%`)
+               .orWhere('id', search);
+      });
+    }
+
+    if (req.query.export === 'csv') {
+      const allUsers = await query.clone().select('id', 'email', 'name', 'provider', 'role_id', 'status', 'created_at').orderBy(column, order).limit(10000);
+      const csv = CsvBuilder.build(allUsers, [
+        { header: 'ID', key: 'id' },
+        { header: 'Email', key: 'email' },
+        { header: 'Name', key: 'name' },
+        { header: 'Provider', key: 'provider' },
+        { header: 'Role ID', key: 'role_id' },
+        { header: 'Status', key: 'status' },
+        { header: 'Created At', key: 'created_at' }
+      ]);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="admin_users_export.csv"');
+      await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'admin_users' } });
+      return res.send(csv);
+    }
+
+    const countQuery = query.clone().clearSelect().count('* as total').first();
+
+    const [countResult, users] = await Promise.all([
+      countQuery,
+      query.clone()
+        .select('id', 'email', 'name', 'provider', 'role_id', 'status', 'created_at')
+        .orderBy(column, order)
+        .limit(parsedLimit)
+        .offset(offset)
+    ]);
+
+    const total = Number(countResult?.total || 0);
+
+    return sendSuccess(res, {
+      total,
+      limit: parsedLimit,
+      page: parsedPage,
+      users
+    }, 'Users retrieved successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * 9. GET /api/admin/audit-logs
- * Bounded search queries with paginated indexing and 90-day search limitations.
+ * Retrieves paginated audit logs.
  */
 export const getAuditLogs = async (req, res, next) => {
   try {
-    const { action, actorId, targetUserId, severity, limit = 50, page = 1 } = req.query;
+    const { action, actorId, targetUserId, severity, search, export: isExport, limit = 50, page = 1 } = req.query;
 
     const parsedLimit = Math.min(Number(limit) || 50, 100);
     const parsedPage = Math.max(Number(page) || 1, 1);
@@ -471,6 +565,32 @@ export const getAuditLogs = async (req, res, next) => {
     if (actorId) query.where({ actor_id: actorId });
     if (targetUserId) query.where({ target_user_id: targetUserId });
     if (severity) query.where({ severity });
+    
+    // Correlation ID or JSONB search
+    if (search) {
+      query.whereRaw(`metadata->>'correlationId' = ?`, [search]);
+    }
+
+    if (isExport === 'csv') {
+      // Bounded massive export (max 10k rows)
+      const logs = await query.clone().select('*').orderBy('occurred_at', 'desc').limit(10000);
+      
+      const csv = CsvBuilder.build(logs, [
+        { header: 'ID', key: 'id' },
+        { header: 'Actor ID', key: 'actor_id' },
+        { header: 'Target User ID', key: 'target_user_id' },
+        { header: 'Action', key: 'action' },
+        { header: 'Severity', key: 'severity' },
+        { header: 'IP Address', key: 'ip_address' },
+        { header: 'Occurred At', key: 'occurred_at' },
+        { header: 'Metadata', key: 'metadata' }
+      ]);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="audit_logs_export.csv"');
+      await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'audit_logs' } });
+      return res.send(csv);
+    }
 
     const countQuery = query.clone().clearSelect().count('* as total').first();
 
@@ -505,9 +625,10 @@ export const getControlPlaneMetrics = async (req, res, next) => {
     // 1. Fetch active admin sessions from database (fully indexed joins)
     const activeAdminSessions = await db('user_sessions')
       .join('users', 'user_sessions.user_id', 'users.id')
-      .select('users.id as userId', 'users.email', 'users.role', 'user_sessions.ip_address', 'user_sessions.id as sessionId')
+      .join('roles', 'users.role_id', 'roles.id')
+      .select('users.id as userId', 'users.email', 'roles.name as role', 'user_sessions.ip_address', 'user_sessions.id as sessionId')
       .where({ 'user_sessions.is_revoked': false, 'user_sessions.is_rotated': false })
-      .whereIn('users.role', ['support_agent', 'support_lead', 'compliance', 'super_admin']);
+      .whereIn('roles.name', ['Support Agent', 'Support Lead', 'Compliance', 'Super Admin', 'Admin']);
 
     // 2. Count active impersonations by scanning keys in Redis
     let impersonationCount = 0;
@@ -570,6 +691,236 @@ export const getControlPlaneMetrics = async (req, res, next) => {
         secondsRemaining: breakGlassActive ? Math.max(0, Math.ceil((3600000 - breakGlassTimeElapsed) / 1000)) : 0
       }
     }, 'Operational intelligence control plane metrics compiled');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 11. GET /api/admin/auth-events
+ * Retrieves paginated authentication events (Login, Register, Suspicious IPs, etc).
+ */
+export const getAuthEvents = async (req, res, next) => {
+  try {
+    const { search, eventCategory, eventType, export: isExport, limit = 50, page = 1 } = req.query;
+
+    const parsedLimit = Math.min(Number(limit) || 50, 100);
+    const parsedPage = Math.max(Number(page) || 1, 1);
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    if (isExport === 'csv') {
+      // Bounded export (up to 10k rows) for performance
+      const { events } = await AuthenticationRepository.getAdminEvents({ search, eventCategory, eventType, limit: 10000, offset: 0 });
+      
+      const csv = CsvBuilder.build(events, [
+        { header: 'ID', key: 'id' },
+        { header: 'User ID', key: 'user_id' },
+        { header: 'Category', key: 'event_category' },
+        { header: 'Type', key: 'event_type' },
+        { header: 'Created At', key: 'created_at' },
+        { header: 'Metadata', key: 'metadata' }
+      ]);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="auth_events_export.csv"');
+      await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'auth_events' } });
+      return res.send(csv);
+    }
+
+    const result = await AuthenticationRepository.getAdminEvents({ search, eventCategory, eventType, limit: parsedLimit, offset });
+
+    return sendSuccess(res, {
+      total: result.total,
+      limit: parsedLimit,
+      page: parsedPage,
+      events: result.events
+    }, 'Authentication events retrieved successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 12. GET /api/admin/system-errors
+ * Retrieves paginated system errors.
+ */
+export const getSystemErrors = async (req, res, next) => {
+  try {
+    const { search, severity, statusCode, export: isExport, limit = 50, page = 1 } = req.query;
+
+    const parsedLimit = Math.min(Number(limit) || 50, 100);
+    const parsedPage = Math.max(Number(page) || 1, 1);
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    if (isExport === 'csv') {
+      const { errors } = await SystemErrorRepository.getErrors({ search, severity, statusCode, limit: 10000, offset: 0 });
+      
+      const csv = CsvBuilder.build(errors, [
+        { header: 'ID', key: 'id' },
+        { header: 'Correlation ID', key: 'correlation_id' },
+        { header: 'Severity', key: 'severity' },
+        { header: 'Status Code', key: 'status_code' },
+        { header: 'Message', key: 'message' },
+        { header: 'URL', key: 'url' },
+        { header: 'Occurred At', key: 'occurred_at' }
+      ]);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="system_errors_export.csv"');
+      await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'system_errors' } });
+      return res.send(csv);
+    }
+
+    const result = await SystemErrorRepository.getErrors({ search, severity, statusCode, limit: parsedLimit, offset });
+
+    return sendSuccess(res, {
+      total: result.total,
+      limit: parsedLimit,
+      page: parsedPage,
+      errors: result.errors
+    }, 'System errors retrieved successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 13. GET /api/admin/sessions
+ * Retrieves all active sessions.
+ */
+export const getSessions = async (req, res, next) => {
+  try {
+    const { search, export: isExport, limit = 50, page = 1 } = req.query;
+    
+    const parsedLimit = Math.min(Number(limit) || 50, 100);
+    const parsedPage = Math.max(Number(page) || 1, 1);
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    const query = db('user_sessions')
+      .join('users', 'user_sessions.user_id', 'users.id')
+      .join('roles', 'users.role_id', 'roles.id')
+      .select(
+        'user_sessions.id',
+        'user_sessions.user_id',
+        'users.email',
+        'roles.name as role',
+        'user_sessions.ip_address',
+        'user_sessions.user_agent',
+        'user_sessions.created_at',
+        'user_sessions.updated_at'
+      )
+      .where({ 'user_sessions.is_revoked': false });
+
+    if (search) {
+      query.where(builder => {
+        builder.where('users.email', 'ILIKE', `%${search}%`)
+               .orWhere('user_sessions.ip_address', search);
+      });
+    }
+
+    if (isExport === 'csv') {
+      const sessions = await query.clone().orderBy('user_sessions.updated_at', 'desc').limit(10000);
+      const csv = CsvBuilder.build(sessions, [
+        { header: 'Session ID', key: 'id' },
+        { header: 'User ID', key: 'user_id' },
+        { header: 'Email', key: 'email' },
+        { header: 'Role', key: 'role' },
+        { header: 'IP Address', key: 'ip_address' },
+        { header: 'User Agent', key: 'user_agent' },
+        { header: 'Created At', key: 'created_at' },
+        { header: 'Last Active', key: 'updated_at' }
+      ]);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="active_sessions_export.csv"');
+      await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'active_sessions' } });
+      return res.send(csv);
+    }
+
+    const countQuery = query.clone().clearSelect().count('* as total').first();
+    const [countResult, sessions] = await Promise.all([
+      countQuery,
+      query.clone().orderBy('user_sessions.updated_at', 'desc').limit(parsedLimit).offset(offset)
+    ]);
+
+    return sendSuccess(res, {
+      total: Number(countResult?.total || 0),
+      limit: parsedLimit,
+      page: parsedPage,
+      sessions
+    }, 'Active sessions retrieved successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getDashboardAnalytics = async (req, res, next) => {
+  try {
+    const data = await analyticsService.getDashboardAnalytics();
+    return sendSuccess(res, data, 'Dashboard analytics retrieved');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getAuthEventsAnalytics = async (req, res, next) => {
+  try {
+    const data = await analyticsService.getAuthEventsAnalytics(req.query);
+    return sendSuccess(res, data, 'Auth events analytics retrieved');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getSystemErrorsAnalytics = async (req, res, next) => {
+  try {
+    const data = await analyticsService.getSystemErrorsAnalytics(req.query);
+    return sendSuccess(res, data, 'System errors analytics retrieved');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getAuditLogsAnalytics = async (req, res, next) => {
+  try {
+    const data = await analyticsService.getAuditLogsAnalytics(req.query);
+    return sendSuccess(res, data, 'Audit logs analytics retrieved');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 14. DELETE /api/admin/sessions/:id
+ * Revokes a specific session.
+ */
+export const revokeSession = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const session = await db('user_sessions').where({ id }).first();
+    if (!session) {
+      return sendError(res, 404, 'Session not found');
+    }
+    
+    // Revoke using the existing service
+    await SessionService.revokeSession(session.id, session.user_id, req.user.id);
+    
+    await logAudit(req, 'REVOKE_SESSION', session.user_id, 'WARNING', { sessionId: session.id, reason: 'Admin revoked session' });
+    return sendSuccess(res, null, 'Session revoked successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 15. DELETE /api/admin/sessions/user/:userId
+ * Revokes all sessions for a specific user.
+ */
+export const revokeUserSessions = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    await SessionService.revokeAllSessions(userId, req.user.id);
+    await logAudit(req, 'REVOKE_ALL_SESSIONS', userId, 'WARNING', { reason: 'Admin revoked all sessions' });
+    return sendSuccess(res, null, 'All sessions revoked successfully');
   } catch (err) {
     next(err);
   }

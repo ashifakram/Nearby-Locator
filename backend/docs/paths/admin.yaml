@@ -31,3 +31,259 @@ Permissions:
         $ref: '../components/responses.yaml#/Unauthorized'
       '403':
         $ref: '../components/responses.yaml#/Forbidden'
+
+
+SudoConfirm:
+  post:
+    operationId: sudoConfirm
+    tags: [Admin]
+    summary: Sudo step-up verification
+    responses:
+      '200':
+        description: Success
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas.yaml#/StandardSuccess'
+
+Users:
+  get:
+    operationId: getAdminUsers
+    tags: [Admin]
+    summary: List all users
+    responses:
+      '200':
+        description: Success
+
+SuspendUser:
+  post:
+    operationId: suspendUser
+    tags: [Admin]
+    summary: Suspend user
+    responses:
+      '200':
+        description: Success
+
+UnlockUser:
+  post:
+    operationId: unlockUser
+    tags: [Admin]
+    summary: Unlock user
+    responses:
+      '200':
+        description: Success
+
+LogoutUser:
+  post:
+    operationId: forceLogout
+    tags: [Admin]
+    summary: Force logout user
+    responses:
+      '200':
+        description: Success
+
+UpdateRolePermissions:
+  put:
+    operationId: updateRolePermissions
+    tags: [Admin]
+    summary: Update permissions for role
+    responses:
+      '200':
+        description: Success
+
+EscalateRole:
+  post:
+    operationId: impersonateUser
+    tags: [Admin]
+    summary: Initiate user impersonation session
+    responses:
+      '200':
+        description: Impersonation initiated
+
+DashboardWidgets:
+  get:
+    operationId: getDashboardWidgets
+    tags: [Admin]
+    summary: Aggregate 35 reusable executive dashboard widgets
+    responses:
+      '200':
+        description: Dashboard widgets retrieved successfully
+      '401':
+        $ref: '../components/responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses.yaml#/Forbidden'
+
+QueueOps:
+  get:
+    operationId: getQueueMetrics
+    tags: [Admin]
+    summary: Retrieve real-time Redis queue depths and worker status
+    responses:
+      '200':
+        description: Queue metrics retrieved successfully
+
+InfrastructureHealth:
+  get:
+    operationId: getInfrastructureHealth
+    tags: [Admin]
+    summary: Retrieve PostgreSQL pool, storage volume, and memory telemetry
+    responses:
+      '200':
+        description: Infrastructure health retrieved successfully
+
+FeatureFlags:
+  get:
+    operationId: getFeatureFlags
+    tags: [Admin]
+    summary: List all feature flags and rollout configurations
+    responses:
+      '200':
+        description: Feature flags retrieved successfully
+
+Impersonate:
+  post:
+    operationId: initiateImpersonation
+    tags: [Admin]
+    summary: Impersonate user
+    responses:
+      '200':
+        description: Success
+
+ExportData:
+  post:
+    operationId: exportUserData
+    tags: [Admin]
+    summary: Export user data
+    responses:
+      '200':
+        description: Success
+
+ExportStatus:
+  get:
+    operationId: getExportStatus
+    tags: [Admin]
+    summary: Get export status
+    responses:
+      '200':
+        description: Success
+
+Downloads:
+  get:
+    operationId: downloadExportedData
+    tags: [Admin]
+    summary: Download exported data
+    responses:
+      '200':
+        description: Success
+
+RetentionOverride:
+  post:
+    operationId: retentionOverride
+    tags: [Admin]
+    summary: Override retention policies
+    responses:
+      '200':
+        description: Success
+
+AuditLogs:
+  get:
+    operationId: getAuditLogs
+    tags: [Admin]
+    summary: Get audit logs
+    responses:
+      '200':
+        description: Success
+
+ControlPlaneMetrics:
+  get:
+    operationId: getControlPlaneMetrics
+    tags: [Admin]
+    summary: Get metrics
+    responses:
+      '200':
+        description: Success
+
+AuthEvents:
+  get:
+    operationId: getAuthEvents
+    tags: [Admin]
+    summary: Get auth events
+    responses:
+      '200':
+        description: Success
+
+SystemErrors:
+  get:
+    operationId: getSystemErrors
+    tags: [Admin]
+    summary: Get system errors
+    responses:
+      '200':
+        description: Success
+
+Sessions:
+  get:
+    operationId: getSessions
+    tags: [Admin]
+    summary: Get sessions
+    responses:
+      '200':
+        description: Success
+
+RevokeSession:
+  delete:
+    operationId: revokeSession
+    tags: [Admin]
+    summary: Revoke session
+    responses:
+      '200':
+        description: Success
+
+RevokeUserSessions:
+  delete:
+    operationId: revokeUserSessions
+    tags: [Admin]
+    summary: Revoke all user sessions
+    responses:
+      '200':
+        description: Success
+
+AnalyticsDashboard:
+  get:
+    operationId: getAnalyticsDashboard
+    tags: [Analytics]
+    summary: Get executive analytics dashboard summary & DAU/WAU metrics
+    responses:
+      '200':
+        description: Dashboard metrics retrieved successfully
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden
+
+AnalyticsAuthEvents:
+  get:
+    operationId: getAnalyticsAuthEvents
+    tags: [Analytics]
+    summary: Get authentication event breakdown analytics
+    responses:
+      '200':
+        description: Auth event metrics retrieved successfully
+
+AnalyticsSystemErrors:
+  get:
+    operationId: getAnalyticsSystemErrors
+    tags: [Analytics]
+    summary: Get system error breakdown analytics
+    responses:
+      '200':
+        description: System error metrics retrieved successfully
+
+AnalyticsAuditLogs:
+  get:
+    operationId: getAnalyticsAuditLogs
+    tags: [Analytics]
+    summary: Get audit log activity analytics
+    responses:
+      '200':
+        description: Audit log metrics retrieved successfully

@@ -1,4 +1,4 @@
-import client from '../redisClient.js';
+import client, { getIsRedisAvailable } from '../redisClient.js';
 import { sendError } from './responseFormatter.js';
 import { dbLogger } from '../utils/dbLogger.js';
 
@@ -60,89 +60,76 @@ const LOCAL_CACHE_MAX_ENTRIES = 5000;
  */
 export const geoRateLimiter = (limit = 10, windowSeconds = 60) => {
   return async (req, res, next) => {
-    try {
-      const latVal = req.query.latitude || req.query.lat || req.body.latitude || req.body.lat;
-      const lngVal = req.query.longitude || req.query.lng || req.body.longitude || req.body.lng;
-      
-      if (!latVal || !lngVal) {
-        return next();
-      }
-
-      const lat = parseFloat(latVal);
-      const lng = parseFloat(lngVal);
-
-      if (isNaN(lat) || isNaN(lng)) {
-        return next();
-      }
-
-      const geohash = encodeGeohash(lat, lng, 5);
-      // Use authenticated user ID if present, otherwise default to client IP
-      const actorId = req.user ? req.user.id : req.ip;
-      const key = `geo:rl:${actorId}`;
-
-      // In Redis, we use a SET to collect distinct Geohashes queried during the window.
-      // SADD returns 1 if added, 0 if already present. SCARD returns unique count.
-      const pipeline = client.multi();
-      pipeline.sAdd(key, geohash);
-      pipeline.sCard(key);
-      pipeline.expire(key, windowSeconds);
-
-      const execResult = await pipeline.exec();
-      const uniqueCount = execResult[1];
-
-      if (uniqueCount > limit) {
-        dbLogger.warn(`[SECURITY][GEO_CRAWL_LIMIT] Coordinate crawling block triggered`, { actorId, uniqueCount });
-        return sendError(
-          res,
-          { code: 'GEO_CRAWLING_DETECTED' },
-          'Query limit exceeded across multiple geo regions. Access suspended momentarily.',
-          429
-        );
-      }
-
-      next();
-    } catch (err) {
-      dbLogger.error('Geo Rate Limiter failed, using local in-memory fallback', err);
-      
-      const latVal = req.query.latitude || req.query.lat || req.body.latitude || req.body.lat;
-      const lngVal = req.query.longitude || req.query.lng || req.body.longitude || req.body.lng;
-      
-      if (!latVal || !lngVal) return next();
-      const lat = parseFloat(latVal);
-      const lng = parseFloat(lngVal);
-      if (isNaN(lat) || isNaN(lng)) return next();
-
-      const geohash = encodeGeohash(lat, lng, 5);
-      const actorId = req.user ? req.user.id : req.ip;
-      const now = Date.now();
-
-      let record = localCrawlerCache.get(actorId) || { geohashes: new Set(), expiresAt: now + windowSeconds * 1000 };
-      
-      if (now > record.expiresAt) {
-        record = { geohashes: new Set(), expiresAt: now + windowSeconds * 1000 };
-      }
-      
-      record.geohashes.add(geohash);
-      
-      // Enforce local memory constraints to prevent local cache overflow attacks
-      if (localCrawlerCache.size > LOCAL_CACHE_MAX_ENTRIES) {
-        const firstKey = localCrawlerCache.keys().next().value;
-        localCrawlerCache.delete(firstKey);
-      }
-      
-      localCrawlerCache.set(actorId, record);
-
-      if (record.geohashes.size > limit) {
-        return sendError(
-          res,
-          { code: 'GEO_CRAWLING_DETECTED' },
-          'Query limit exceeded across multiple geo regions. Access suspended momentarily.',
-          429
-        );
-      }
-
-      next();
+    const latVal = req.query.latitude || req.query.lat || req.body.latitude || req.body.lat;
+    const lngVal = req.query.longitude || req.query.lng || req.body.longitude || req.body.lng;
+    
+    if (!latVal || !lngVal) {
+      return next();
     }
+
+    const lat = parseFloat(latVal);
+    const lng = parseFloat(lngVal);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return next();
+    }
+
+    const geohash = encodeGeohash(lat, lng, 5);
+    const actorId = req.user ? req.user.id : req.ip;
+
+    if (getIsRedisAvailable()) {
+      try {
+        const key = `geo:rl:${actorId}`;
+        const pipeline = client.multi();
+        pipeline.sAdd(key, geohash);
+        pipeline.sCard(key);
+        pipeline.expire(key, windowSeconds);
+
+        const execResult = await pipeline.exec();
+        const uniqueCount = execResult[1];
+
+        if (uniqueCount > limit) {
+          dbLogger.warn(`[SECURITY][GEO_CRAWL_LIMIT] Coordinate crawling block triggered`, { actorId, uniqueCount });
+          return sendError(
+            res,
+            { code: 'GEO_CRAWLING_DETECTED' },
+            'Query limit exceeded across multiple geo regions. Access suspended momentarily.',
+            429
+          );
+        }
+        return next();
+      } catch (err) {
+        dbLogger.warn('Geo Rate Limiter failed in Redis mode, falling back to local memory', err);
+      }
+    }
+
+    // Local Fallback Logic
+    const now = Date.now();
+    let record = localCrawlerCache.get(actorId) || { geohashes: new Set(), expiresAt: now + windowSeconds * 1000 };
+    
+    if (now > record.expiresAt) {
+      record = { geohashes: new Set(), expiresAt: now + windowSeconds * 1000 };
+    }
+    
+    record.geohashes.add(geohash);
+    
+    if (localCrawlerCache.size > LOCAL_CACHE_MAX_ENTRIES) {
+      const firstKey = localCrawlerCache.keys().next().value;
+      localCrawlerCache.delete(firstKey);
+    }
+    
+    localCrawlerCache.set(actorId, record);
+
+    if (record.geohashes.size > limit) {
+      return sendError(
+        res,
+        { code: 'GEO_CRAWLING_DETECTED' },
+        'Query limit exceeded across multiple geo regions. Access suspended momentarily.',
+        429
+      );
+    }
+
+    next();
   };
 };
 
