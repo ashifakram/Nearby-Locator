@@ -404,7 +404,7 @@ export const getAdminReports = async (req, res) => {
     const query = db('reports')
       .join('users as reporter', 'reports.reporter_id', 'reporter.id')
       .join('spots', 'reports.spot_id', 'spots.id')
-      .select('reports.*', 'reporter.email as reporter_email', 'spots.title as spot_title');
+      .select('reports.*', 'reporter.email as reporter_email', 'spots.name as spot_title');
       
     if (req.query.status) query.where('reports.status', req.query.status);
     
@@ -416,6 +416,7 @@ export const getAdminReports = async (req, res) => {
     
     return sendSuccess(res, { total: Number(countResult?.total || 0), limit, page, reports }, 'Reports retrieved.');
   } catch (err) {
+    logger.error('GET_ADMIN_REPORTS_FAILED', err);
     return sendError(res, { code: 'DATABASE_ERROR' }, 'Error fetching reports.', 500);
   }
 };
@@ -428,7 +429,7 @@ export const getAdminAppeals = async (req, res) => {
     const query = db('moderation_appeals')
       .join('users as appellant', 'moderation_appeals.user_id', 'appellant.id')
       .join('spots', 'moderation_appeals.spot_id', 'spots.id')
-      .select('moderation_appeals.*', 'appellant.email as appellant_email', 'spots.title as spot_title');
+      .select('moderation_appeals.*', 'appellant.email as appellant_email', 'spots.name as spot_title');
       
     if (req.query.status) query.where('moderation_appeals.status', req.query.status);
     
@@ -440,6 +441,7 @@ export const getAdminAppeals = async (req, res) => {
     
     return sendSuccess(res, { total: Number(countResult?.total || 0), limit, page, appeals }, 'Appeals retrieved.');
   } catch (err) {
+    logger.error('GET_ADMIN_APPEALS_FAILED', err);
     return sendError(res, { code: 'DATABASE_ERROR' }, 'Error fetching appeals.', 500);
   }
 };

@@ -6,6 +6,7 @@ import { EmailService } from './emailService.js';
 import { NotificationService } from './notificationService.js';
 import { OtpService } from './otpService.js';
 import { PasswordPolicy } from './passwordPolicy.js';
+import { UserPreferencesService } from './userPreferencesService.js';
 import { AuthenticationRepository } from '../repositories/authenticationRepository.js';
 import OAuthRepository from '../repositories/oauthRepository.js';
 import { RbacRepository } from '../repositories/rbacRepository.js';
@@ -39,6 +40,10 @@ export const AuthenticationService = {
       return { success: false, error: { code: 'VALIDATION_FAILED', message: 'Invalid email or password.' } };
     }
 
+    if (metadata.agreed === false) {
+      return { success: false, error: { code: 'TERMS_AGREEMENT_REQUIRED', message: 'You must agree to the Terms of Service and Privacy Policy to register.' } };
+    }
+
     const sanitizedProfileData = { ...profileData };
     delete sanitizedProfileData.id;
     delete sanitizedProfileData.status;
@@ -68,6 +73,8 @@ export const AuthenticationService = {
           passwordHash: passwordHash,
           status: USER_STATUS.PENDING_VERIFICATION,
           roleId: defaultRole.id,
+          agreed_to_terms: true,
+          agreed_to_terms_at: new Date(),
           ...sanitizedProfileData
         };
 
@@ -153,6 +160,7 @@ export const AuthenticationService = {
     }
 
     const trimmedInput = inputTokenOrOtp.trim();
+    let userToWelcome = null;
 
     // Route A: 6-digit OTP Verification
     if (/^\d{6}$/.test(trimmedInput)) {
@@ -186,47 +194,64 @@ export const AuthenticationService = {
         }, executor);
       });
 
-      return { success: true };
-    }
+      userToWelcome = user;
+    } else {
+      // Route B: Legacy Token String Verification
+      const result = await withTransaction(async (executor) => {
+        const tokenHash = crypto.createHash('sha256').update(trimmedInput).digest('hex');
+        const tokenEntity = await AuthenticationRepository.findVerificationTokenForUpdate(tokenHash, executor);
 
-    // Route B: Legacy Token String Verification
-    return await withTransaction(async (executor) => {
-      const tokenHash = crypto.createHash('sha256').update(trimmedInput).digest('hex');
-      const tokenEntity = await AuthenticationRepository.findVerificationTokenForUpdate(tokenHash, executor);
+        if (!tokenEntity) {
+          return { success: false, error: { code: 'TOKEN_INVALID', message: 'Verification token is invalid or does not exist.' } };
+        }
 
-      if (!tokenEntity) {
-        return { success: false, error: { code: 'TOKEN_INVALID', message: 'Verification token is invalid or does not exist.' } };
+        const user = await IdentityService.findByIdForUpdate(tokenEntity.user_id, executor);
+        if (!user) {
+          return { success: false, error: { code: 'USER_NOT_FOUND', message: 'User associated with token not found.' } };
+        }
+
+        if (user.status === USER_STATUS.ACTIVE) {
+          return { success: true, alreadyVerified: true };
+        }
+
+        if (tokenEntity.consumed_at) {
+          return { success: false, error: { code: 'TOKEN_CONSUMED', message: 'Verification token has already been used.' } };
+        }
+
+        if (new Date(tokenEntity.expires_at) < new Date()) {
+          return { success: false, error: { code: 'TOKEN_EXPIRED', message: 'Verification token has expired.' } };
+        }
+
+        await AuthenticationRepository.consumeVerificationToken(tokenEntity.id, executor);
+        await IdentityService.changeStatus(user.id, USER_STATUS.ACTIVE, executor);
+
+        await AuthenticationRepository.logEvent({
+          event_category: 'email_verification',
+          event_type: 'verification_success',
+          metadata: { ipAddress: metadata.ipAddress, userAgent: metadata.userAgent, method: 'LINK' },
+          user_id: user.id
+        }, executor);
+
+        return { success: true, user };
+      });
+
+      if (!result.success) {
+        return result;
       }
-
-      const user = await IdentityService.findByIdForUpdate(tokenEntity.user_id, executor);
-      if (!user) {
-        return { success: false, error: { code: 'USER_NOT_FOUND', message: 'User associated with token not found.' } };
-      }
-
-      if (user.status === USER_STATUS.ACTIVE) {
+      if (result.alreadyVerified) {
         return { success: true, alreadyVerified: true };
       }
+      userToWelcome = result.user;
+    }
 
-      if (tokenEntity.consumed_at) {
-        return { success: false, error: { code: 'TOKEN_CONSUMED', message: 'Verification token has already been used.' } };
-      }
+    if (userToWelcome) {
+      NotificationService.notifyUser(userToWelcome.email, 'WELCOME', {
+        userName: userToWelcome.name || userToWelcome.email.split('@')[0],
+        dashboardUrl: `${process.env.APP_URL || 'http://localhost:3000'}/dashboard`
+      }).catch(err => logger.error('[AuthenticationService] Failed to send welcome email:', err));
+    }
 
-      if (new Date(tokenEntity.expires_at) < new Date()) {
-        return { success: false, error: { code: 'TOKEN_EXPIRED', message: 'Verification token has expired.' } };
-      }
-
-      await AuthenticationRepository.consumeVerificationToken(tokenEntity.id, executor);
-      await IdentityService.changeStatus(user.id, USER_STATUS.ACTIVE, executor);
-
-      await AuthenticationRepository.logEvent({
-        event_category: 'email_verification',
-        event_type: 'verification_success',
-        metadata: { ipAddress: metadata.ipAddress, userAgent: metadata.userAgent, method: 'LINK' },
-        user_id: user.id
-      }, executor);
-
-      return { success: true };
-    });
+    return { success: true };
   },
 
   /**
@@ -339,6 +364,11 @@ export const AuthenticationService = {
       throw new Error('Account is not active.');
     }
 
+    // Trigger security login alert asynchronously (checks user preferences first)
+    this._triggerLoginAlert(user, metadata).catch(err => 
+      logger.error('[AuthenticationService] Failed to send login alert for loginLocal:', err)
+    );
+
     return { success: true, data: sessionResult };
   },
   
@@ -371,6 +401,11 @@ export const AuthenticationService = {
         });
         
         authLoginSuccessTotal.labels(provider, provider).inc();
+        
+        this._triggerLoginAlert(user, metadata).catch(err => 
+          logger.error('[AuthenticationService] Failed to send login alert for loginOAuth (linked):', err)
+        );
+
         return { success: true, data: sessionResult };
       }
 
@@ -425,6 +460,11 @@ export const AuthenticationService = {
       });
 
       authLoginSuccessTotal.labels(provider, provider).inc();
+      
+      this._triggerLoginAlert(user, metadata).catch(err => 
+        logger.error('[AuthenticationService] Failed to send login alert for loginOAuth (new/link):', err)
+      );
+
       return { success: true, data: sessionResult };
 
     } catch (e) {
@@ -756,5 +796,26 @@ export const AuthenticationService = {
       await SessionService.revokeAllSessionsExceptCurrent(userId, currentSessionId, executor);
       return { success: true };
     });
+  },
+
+  async _triggerLoginAlert(user, metadata = {}) {
+    try {
+      const prefs = await UserPreferencesService.getPreferences(user.id);
+      if (prefs.notification_settings?.security_alerts !== false) {
+        const browser = metadata.browserName || metadata.userAgent || 'Unknown Browser';
+        const os = metadata.osName || 'Unknown OS';
+        
+        await NotificationService.notifyUser(user.email, 'LOGIN_ALERT', {
+          userName: user.name || user.email.split('@')[0],
+          ipAddress: metadata.ipAddress || '127.0.0.1',
+          userAgent: metadata.userAgent || 'Unknown User Agent',
+          browser,
+          os,
+          location: metadata.location || 'Unknown Location'
+        });
+      }
+    } catch (err) {
+      logger.error(`[AuthenticationService] Failed to trigger login alert for user ${user.id}:`, err);
+    }
   }
 };

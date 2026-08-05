@@ -17,6 +17,7 @@ const contactSchema = z.object({
 export default function ContactPage() {
   const { showToast } = useToastStore();
   const [submitted, setSubmitted] = useState(false);
+  const [ticketId, setTicketId] = useState('');
 
   const {
     register,
@@ -29,11 +30,25 @@ export default function ContactPage() {
   });
 
   const onSubmit = async (data) => {
-    // Simulate API request delay
-    await new Promise((res) => setTimeout(res, 800));
-    setSubmitted(true);
-    showToast('Your message has been received! Our support team will get back to you shortly.', 'success');
+    try {
+      const res = await fetch('/api/contact/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setTicketId(json.ticket_id);
+        setSubmitted(true);
+        showToast(`Ticket ${json.ticket_id} created. Check your email for confirmation.`, 'success');
+      } else {
+        showToast(json.message || 'Failed to send. Please try again.', 'error');
+      }
+    } catch {
+      showToast('Network error. Please check your connection and try again.', 'error');
+    }
   };
+
 
   return (
     <div className="bg-slate-50/60 font-sans text-slate-900 min-h-[calc(100vh-200px)] py-12 md:py-16">
@@ -100,13 +115,19 @@ export default function ContactPage() {
                     <CheckCircle2 className="w-8 h-8" />
                   </div>
                   <Heading level={2} className="text-xl font-bold">Message Sent!</Heading>
+                  {ticketId && (
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm font-mono font-semibold">
+                      🎫 Ticket ID: {ticketId}
+                    </div>
+                  )}
                   <Text size="sm" className="text-slate-600 max-w-sm mx-auto">
-                    Thank you for reaching out. A support ticket has been created and our team will respond to your email shortly.
+                    A confirmation email has been sent to your inbox with your ticket details. Our support team will respond shortly.
                   </Text>
                   <Button
                     variant="outline"
                     onClick={() => {
                       setSubmitted(false);
+                      setTicketId('');
                       reset();
                     }}
                   >

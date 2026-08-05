@@ -1,0 +1,103 @@
+{
+  "exported_at": "2026-08-04T07:46:23.445Z",
+  "account": {
+    "id": "ca09f96b-f707-4c35-b2f2-af27843c2ce7",
+    "email": "account_test_user@example.com",
+    "name": "Account Test User",
+    "avatar_url": null,
+    "provider": "local",
+    "google_id": null,
+    "status": "ACTIVE",
+    "created_at": "2026-08-04T07:46:23.049Z",
+    "updated_at": "2026-08-04T07:46:23.375Z",
+    "created_by": null,
+    "updated_by": null,
+    "password_reset_token_hash": null,
+    "password_reset_expires_at": null,
+    "email_verification_token_hash": null,
+    "email_verification_expires_at": null,
+    "last_reset_request_at": null,
+    "last_verification_request_at": "2026-08-04T07:46:23.049Z",
+    "timezone": "America/New_York",
+    "trust_score": 0.5,
+    "last_recovery_at": null,
+    "failed_login_count": 0,
+    "last_login_at": "2026-08-04T07:46:23.375Z",
+    "agreed_to_terms": true,
+    "agreed_to_terms_at": "2026-08-04T07:46:23.050Z",
+    "avatar_source": "default",
+    "profile": {
+      "first_name": null,
+      "last_name": null,
+      "display_name": "Account Test User",
+      "username": null,
+      "bio": null,
+      "phone": null,
+      "address": null,
+      "country": null,
+      "state": null,
+      "city": null,
+      "postal_code": null,
+      "timezone": "America/New_York",
+      "language": "en"
+    },
+    "preferences": {
+      "theme": "system",
+      "language": "en",
+      "timezone": "America/New_York",
+      "search_preferences": {},
+      "ai_preferences": {},
+      "privacy_settings": {
+        "profile_visibility": "private",
+        "recommendation_preferences": {},
+        "marketing_preferences": {
+          "email": false,
+          "in_app": true
+        }
+      },
+      "notification_settings": {
+        "email_notifications": {
+          "marketing": false,
+          "security": true,
+          "updates": true
+        },
+        "in_app_notifications": {
+          "mentions": true,
+          "activity": true
+        },
+        "security_alerts": true
+      }
+    }
+  },
+  "active_sessions": [
+    {
+      "id": "a9e21455-09de-430a-a8ae-0ada1e3f8325",
+      "ipAddress": null,
+      "userAgent": null,
+      "createdAt": "2026-08-04T07:46:23.375Z",
+      "updatedAt": "2026-08-04T07:46:23.375Z"
+    }
+  ],
+  "login_history": [
+    {
+      "id": "e2d0921b-adda-4c0e-9ae5-cd12d8d47172",
+      "login_method": "local",
+      "device_type": "Unknown",
+      "os_name": "Unknown",
+      "browser_name": "Unknown",
+      "location_city": null,
+      "occurred_at": "2026-08-04T07:46:23.375Z"
+    }
+  ],
+  "security_events": [
+    {
+      "id": "fcba4d72-2099-48b5-aa5e-c5d9c0623fc0",
+      "action": "ACCOUNT_EXPORT_PROCESSING",
+      "severity": "INFO",
+      "ip_address": "127.0.0.1",
+      "occurred_at": "2026-08-04T07:46:23.415Z",
+      "metadata": {}
+    }
+  ],
+  "oauth_accounts": []
+}

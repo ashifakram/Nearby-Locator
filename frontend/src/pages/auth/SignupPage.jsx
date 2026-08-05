@@ -79,7 +79,7 @@ export default function SignupPage() {
     abortControllerRef.current = new AbortController();
 
     try {
-      await authService.signup(data.name, data.email, data.password, abortControllerRef.current.signal);
+      await authService.signup(data.name, data.email, data.password, data.termsAccepted, abortControllerRef.current.signal);
       navigate('/verify-email', { state: { email: data.email } });
     } catch (err) {
       if (err.name === 'CanceledError') return;

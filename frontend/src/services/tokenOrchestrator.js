@@ -9,9 +9,17 @@ let refreshSubscribers = [];
 
 export function setInMemoryAccessToken(token) {
   inMemoryAccessToken = token;
+  if (token) {
+    try { localStorage.setItem('accessToken', token); } catch (e) {}
+  } else {
+    try { localStorage.removeItem('accessToken'); } catch (e) {}
+  }
 }
 
 export function getInMemoryAccessToken() {
+  if (!inMemoryAccessToken) {
+    try { inMemoryAccessToken = localStorage.getItem('accessToken'); } catch (e) {}
+  }
   return inMemoryAccessToken;
 }
 

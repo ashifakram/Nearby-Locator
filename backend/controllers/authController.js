@@ -9,6 +9,7 @@ import { dbLogger } from '../utils/dbLogger.js';
 import { AuthenticationService } from '../services/authenticationService.js';
 import { SessionService } from '../services/sessionService.js';
 import ProviderFactory from '../providers/ProviderFactory.js';
+import { logAudit } from '../utils/auditLogger.js';
 
 // Map domain errors to HTTP statuses
 const mapDomainErrorToStatus = (code) => {
@@ -78,14 +79,22 @@ const clearRefreshTokenCookie = (res) => {
 
 export const signup = async (req, res, next) => {
   try {
-    const { email, password, name } = req.body;
-    const metadata = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+    const { email, password, name, agreed } = req.body;
+    const metadata = { ipAddress: req.ip, userAgent: req.headers['user-agent'], agreed };
 
     const result = await AuthenticationService.registerLocal(email, password, { name }, metadata);
     if (!result.success) {
       const status = mapDomainErrorToStatus(result.error.code);
       return sendError(res, result.error, result.error.message, status);
     }
+
+    await logAudit({
+      req,
+      actorId: result.data.user?.id || null,
+      action: 'USER_SIGNUP',
+      severity: 'INFO',
+      metadata: { email: result.data.user?.email }
+    });
 
     return sendSuccess(res, { user: result.data.user }, 'Registration successful. Please verify your email using the 6-digit OTP sent to your email.', 201);
   } catch (err) {
@@ -100,9 +109,23 @@ export const login = async (req, res, next) => {
 
     const result = await AuthenticationService.loginLocal(email, password, metadata);
     if (!result.success) {
+      await logAudit({
+        req,
+        actorId: null,
+        action: 'LOGIN_FAILED',
+        severity: 'WARNING',
+        metadata: { email, reason: result.error?.code }
+      });
       const status = mapDomainErrorToStatus(result.error.code);
       return sendError(res, result.error, result.error.message, status);
     }
+
+    await logAudit({
+      req,
+      actorId: result.data.user?.id || null,
+      action: 'USER_LOGIN',
+      severity: 'INFO'
+    });
 
     setRefreshTokenCookie(res, result.data.refreshToken);
     return sendSuccess(res, { token: result.data.accessToken, user: result.data.user }, 'Login successful', 200);
@@ -132,11 +155,20 @@ export const refresh = async (req, res, next) => {
 
 export const logout = async (req, res, next) => {
   try {
-    const sessionId = req.user.sessionId;
+    const sessionId = req.user.sessionId || req.user.sid;
+    const userId = req.user.id;
     const metadata = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
 
     await AuthenticationService.logout(sessionId, metadata);
     clearRefreshTokenCookie(res);
+
+    await logAudit({
+      req,
+      actorId: userId,
+      action: 'LOGOUT',
+      severity: 'INFO',
+      metadata: { sessionId }
+    });
 
     return sendSuccess(res, null, 'Logged out successfully', 200);
   } catch (err) {
@@ -151,6 +183,13 @@ export const logoutAll = async (req, res, next) => {
 
     await AuthenticationService.logoutAll(userId, metadata);
     clearRefreshTokenCookie(res);
+
+    await logAudit({
+      req,
+      actorId: userId,
+      action: 'LOGOUT_ALL',
+      severity: 'WARNING'
+    });
 
     return sendSuccess(res, null, 'Logged out from all devices successfully', 200);
   } catch (err) {
@@ -178,6 +217,14 @@ export const requestPasswordReset = async (req, res, next) => {
       const status = mapDomainErrorToStatus(result.error.code);
       return sendError(res, result.error, result.error.message, status);
     }
+
+    await logAudit({
+      req,
+      actorId: null,
+      action: 'PASSWORD_RESET_REQUESTED',
+      severity: 'INFO',
+      metadata: { email }
+    });
 
     return sendSuccess(res, null, 'If the account exists, a 6-digit password reset OTP has been sent.', 200);
   } catch (err) {
@@ -219,6 +266,13 @@ export const resetPassword = async (req, res, next) => {
       return sendError(res, result.error, result.error.message, status);
     }
 
+    await logAudit({
+      req,
+      actorId: result.user?.id || null,
+      action: 'PASSWORD_RESET_COMPLETED',
+      severity: 'WARNING'
+    });
+
     return sendSuccess(res, null, 'Password has been successfully reset. All active sessions have been revoked. Please log in.', 200);
   } catch (err) {
     next(err);
@@ -237,6 +291,13 @@ export const changePassword = async (req, res, next) => {
       const status = mapDomainErrorToStatus(result.error.code);
       return sendError(res, result.error, result.error.message, status);
     }
+
+    await logAudit({
+      req,
+      actorId: userId,
+      action: 'PASSWORD_CHANGED',
+      severity: 'WARNING'
+    });
 
     return sendSuccess(res, null, 'Password successfully changed.', 200);
   } catch (err) {
@@ -264,6 +325,13 @@ export const verifyEmail = async (req, res, next) => {
     if (result.alreadyVerified) {
       return sendSuccess(res, null, 'Email already verified.', 200);
     }
+
+    await logAudit({
+      req,
+      actorId: result.user?.id || null,
+      action: 'EMAIL_VERIFIED',
+      severity: 'INFO'
+    });
 
     return sendSuccess(res, null, 'Email verified successfully. You can now sign in.', 200);
   } catch (err) {
@@ -317,10 +385,27 @@ export const googleUpsert = async (req, res, next) => {
     const result = await AuthenticationService.loginOAuth(normalizedProfile, metadata);
 
     if (!result.success) {
+      await logAudit({
+        req,
+        actorId: null,
+        action: 'LOGIN_FAILED',
+        severity: 'WARNING',
+        metadata: { provider: 'google', reason: result.error?.code }
+      });
       return sendError(res, result.error, result.error.message, 400);
     }
 
     setRefreshTokenCookie(res, result.data.refreshToken);
+
+    const auditAction = result.data.user?.created_at === result.data.user?.updated_at ? 'GOOGLE_ACCOUNT_LINKED' : 'GOOGLE_LOGIN';
+
+    await logAudit({
+      req,
+      actorId: result.data.user?.id || null,
+      action: auditAction,
+      severity: 'INFO',
+      metadata: { provider: 'google' }
+    });
 
     return sendSuccess(res, {
       token: result.data.accessToken,
@@ -347,6 +432,15 @@ export const unlinkProvider = async (req, res, next) => {
     } catch (e) {}
 
     await AuthenticationService.unlinkOAuth(userId, providerName);
+
+    await logAudit({
+      req,
+      actorId: userId,
+      action: 'OAUTH_UNLINKED',
+      severity: 'WARNING',
+      metadata: { provider: providerName }
+    });
+
     return sendSuccess(res, null, `${providerName} account unlinked`, 200);
   } catch (err) {
     next(err);

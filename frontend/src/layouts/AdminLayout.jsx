@@ -74,8 +74,8 @@ export default function AdminLayout() {
       items: [
         {
           label: 'Moderation Queue',
-          path: '/admin',
-          active: location.pathname === '/admin',
+          path: '/admin/queues',
+          active: location.pathname === '/admin/queues' || location.pathname === '/admin',
           icon: ShieldCheck,
         },
         {
@@ -140,13 +140,13 @@ export default function AdminLayout() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col font-sans selection:bg-blue-600 selection:text-white transition-colors duration-200 ${
+      className={`h-screen overflow-hidden flex flex-col font-sans selection:bg-blue-600 selection:text-white transition-colors duration-200 ${
         isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}
     >
       {/* Impersonation Warning Banner */}
       {isImpersonating && (
-        <div className="bg-amber-500 text-amber-950 px-6 py-2 flex items-center justify-between text-xs font-bold shadow-xs z-50">
+        <div className="bg-amber-500 text-amber-950 px-6 py-2 flex items-center justify-between text-xs font-bold shadow-xs z-50 shrink-0">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 animate-pulse shrink-0" />
             <span>YOU ARE IMPERSONATING A USER SESSION. All actions logged as administrative impersonation.</span>
@@ -154,24 +154,24 @@ export default function AdminLayout() {
           <button
             type="button"
             onClick={handleStopImpersonating}
-            className="bg-amber-950 text-white hover:bg-amber-900 px-3 py-1 rounded-lg text-[10px] uppercase tracking-wider font-semibold transition-colors shadow-xs"
+            className="bg-amber-950 text-white hover:bg-amber-900 px-3 py-1 rounded-lg text-[10px] uppercase tracking-wider font-semibold transition-colors shadow-xs cursor-pointer"
           >
             Exit Impersonation
           </button>
         </div>
       )}
 
-      <div className="flex-grow flex w-full min-h-screen">
-        {/* Sidebar Navigation */}
+      <div className="flex-grow flex w-full h-full overflow-hidden">
+        {/* Sticky 100vh Sidebar Navigation */}
         <aside
-          className={`w-64 border-r flex flex-col justify-between shrink-0 transition-colors ${
+          className={`w-64 border-r flex flex-col justify-between shrink-0 h-full transition-colors z-30 ${
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80 shadow-xs'
           }`}
         >
-          <div>
+          <div className="flex flex-col h-full overflow-hidden">
             {/* Logo Header */}
-            <div className="p-5 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-3">
-              <Link to="/admin" className="flex items-center gap-2.5 group cursor-pointer">
+            <div className="p-5 border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-3 shrink-0">
+              <Link to="/admin" className="flex items-center gap-2.5 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl">
                 <img
                   src="/nearby_locator_standalone_icon.png"
                   alt="Nearby Locator"
@@ -189,7 +189,7 @@ export default function AdminLayout() {
             </div>
 
             {/* Nav Groups */}
-            <div className="p-3 flex flex-col gap-5 overflow-y-auto max-h-[calc(100vh-180px)]">
+            <div className="p-3 flex flex-col gap-5 overflow-y-auto flex-grow scrollbar-thin">
               {navGroups.map((group, gIdx) => {
                 const visibleItems = group.items.filter(
                   (item) => !item.permission || hasPermission(item.permission) || hasPermission('admin.access')
@@ -209,7 +209,7 @@ export default function AdminLayout() {
                           key={idx}
                           type="button"
                           onClick={() => navigate(item.path)}
-                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                             item.active
                               ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 shadow-2xs font-bold'
                               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
@@ -227,7 +227,7 @@ export default function AdminLayout() {
           </div>
 
           {/* User Profile & Theme Footer */}
-          <div className="p-3 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
+          <div className="p-3 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-2 shrink-0">
             <div className="flex items-center justify-between px-2">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center shrink-0">
@@ -243,7 +243,7 @@ export default function AdminLayout() {
               <button
                 type="button"
                 onClick={toggleTheme}
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 title="Toggle Theme"
               >
                 {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5" />}
@@ -253,7 +253,7 @@ export default function AdminLayout() {
             <button
               type="button"
               onClick={() => navigate('/discover')}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Exit to App Console</span>
@@ -261,15 +261,15 @@ export default function AdminLayout() {
           </div>
         </aside>
 
-        {/* Content Viewport Canvas */}
-        <main className="flex-grow overflow-y-auto relative flex flex-col p-6 lg:p-10 max-w-7xl mx-auto w-full">
+        {/* Dedicated Content Viewport — Only This Scrolls */}
+        <main className="flex-grow overflow-y-auto h-full relative flex flex-col p-6 lg:p-8 max-w-7xl mx-auto w-full">
           <Outlet context={{ triggerSudo }} />
         </main>
       </div>
 
       {/* Sudo Password Step-Up Modal */}
       {isSudoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-8 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
             <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-100 dark:border-blue-900">
               <Lock className="w-6 h-6" />

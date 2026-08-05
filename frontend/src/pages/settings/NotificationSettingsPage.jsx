@@ -28,32 +28,39 @@ export default function NotificationSettingsPage() {
 
   useEffect(() => {
     if (notificationsData) {
-      if (notificationsData.securityAlerts !== undefined) setSecurityAlerts(notificationsData.securityAlerts);
-      if (notificationsData.productUpdates !== undefined) setProductUpdates(notificationsData.productUpdates);
-      if (notificationsData.marketingEmails !== undefined) setMarketingEmails(notificationsData.marketingEmails);
-      if (notificationsData.weeklyDigest !== undefined) setWeeklyDigest(notificationsData.weeklyDigest);
+      const email = notificationsData.email_notifications || {};
+      if (notificationsData.security_alerts !== undefined) setSecurityAlerts(notificationsData.security_alerts);
+      if (email.updates !== undefined) setProductUpdates(email.updates);
+      if (email.marketing !== undefined) setMarketingEmails(email.marketing);
+      if (email.weekly_digest !== undefined) setWeeklyDigest(email.weekly_digest);
     }
   }, [notificationsData]);
 
   // Mutation
   const updateMutation = useMutation({
+    queryKey: queryKeys.settings.notifications(),
     mutationFn: (newSettings) => userSettingsService.updateNotificationSettings(newSettings),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.settings.notifications() });
-      showToast('Notification preferences saved!', 'success');
+      showToast('Notification preferences saved to server!', 'success');
     },
     onError: (err) => {
-      showToast('Notification settings saved locally.', 'success');
+      showToast('Failed to sync settings with server.', 'error');
     }
   });
 
   const handleToggle = (setter, keyName, val) => {
     setter(val);
+    
+    const emailPayload = {
+      updates: keyName === 'productUpdates' ? val : productUpdates,
+      marketing: keyName === 'marketingEmails' ? val : marketingEmails,
+      weekly_digest: keyName === 'weeklyDigest' ? val : weeklyDigest,
+    };
+
     updateMutation.mutate({
-      securityAlerts: keyName === 'securityAlerts' ? val : securityAlerts,
-      productUpdates: keyName === 'productUpdates' ? val : productUpdates,
-      weeklyDigest: keyName === 'weeklyDigest' ? val : weeklyDigest,
-      marketingEmails: keyName === 'marketingEmails' ? val : marketingEmails
+      security_alerts: keyName === 'securityAlerts' ? val : securityAlerts,
+      email_notifications: emailPayload,
     });
   };
 

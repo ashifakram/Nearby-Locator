@@ -13,10 +13,22 @@ export default function AdminFilterBar({
 }) {
   const [debouncedSearch, setDebouncedSearch] = useState(searchValue || '');
 
+  React.useEffect(() => {
+    setDebouncedSearch(searchValue || '');
+  }, [searchValue]);
+
   const handleSearch = (e) => {
-    setDebouncedSearch(e.target.value);
+    const val = e.target.value;
+    setDebouncedSearch(val);
     if (onSearchChange) {
-      onSearchChange(e.target.value);
+      onSearchChange(val);
+    }
+  };
+
+  const handleClear = () => {
+    setDebouncedSearch('');
+    if (onSearchChange) {
+      onSearchChange('');
     }
   };
 
@@ -29,11 +41,20 @@ export default function AdminFilterBar({
           </div>
           <input
             type="text"
-            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-xl pl-9 pr-4 py-2 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium"
+            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-xl pl-9 pr-8 py-2 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 transition-all font-medium"
             placeholder={searchPlaceholder}
             value={debouncedSearch}
             onChange={handleSearch}
           />
+          {debouncedSearch && (
+            <button
+              onClick={handleClear}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer text-xs font-bold"
+              title="Clear search"
+            >
+              ✕
+            </button>
+          )}
         </div>
         
         {/* Dynamic Filters */}

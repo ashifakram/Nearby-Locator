@@ -17,8 +17,11 @@ export default function GlobalAuthListener() {
   }, [navigationEvent, navigate, clearNavigation]);
 
   useEffect(() => {
+    let lastRefresh = 0;
     const handlePermissionRefresh = () => {
-      useToastStore.getState().showToast('Authorization expired. Refreshing permissions...', 'error');
+      const now = Date.now();
+      if (now - lastRefresh < 10000) return;
+      lastRefresh = now;
       authService.fetchUserPermissions();
     };
 

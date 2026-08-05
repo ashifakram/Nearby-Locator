@@ -21,12 +21,15 @@ export const validateTestEnvironment = () => {
 // PostgreSQL-Native Cascading Truncation and Sequence Resets for Test Isolation
 export const seedDefaultRoles = async () => {
   const rolesToInsert = [
-    { name: 'user', description: 'Standard User', is_system: true, priority: 10 },
-    { name: 'admin', description: 'System Administrator', is_system: true, priority: 100 },
-    { name: 'moderator', description: 'Content Moderator', is_system: true, priority: 50 }
+    { name: 'Super Admin', description: 'Absolute system control', is_system: true, priority: 100 },
+    { name: 'Admin', description: 'Standard administrative access', is_system: true, priority: 50 },
+    { name: 'Moderator', description: 'Content Moderator', is_system: true, priority: 50 },
+    { name: 'User', description: 'Standard user access', is_system: true, priority: 10 }
   ];
   for (const role of rolesToInsert) {
-    const exists = await db('roles').where({ name: role.name }).first();
+    const exists = await db('roles')
+      .whereRaw('LOWER(TRIM(name)) = LOWER(TRIM(?))', [role.name])
+      .first();
     if (!exists) {
       await db('roles').insert(role);
     }

@@ -25,35 +25,50 @@ export const AdminUserService = {
     const parsedPage = Math.max(1, Number(page) || 1);
     const offset = (parsedPage - 1) * parsedLimit;
 
-    const query = db('users');
+    const query = db('users')
+      .leftJoin('user_roles', 'users.id', 'user_roles.user_id')
+      .leftJoin('roles', 'user_roles.role_id', 'roles.id');
 
     if (search) {
       const term = `%${search.trim()}%`;
       query.where((q) => {
         q.where('users.email', 'ILIKE', term)
          .orWhere('users.name', 'ILIKE', term)
-         .orWhere('users.id', search.trim());
+         .orWhere('roles.name', 'ILIKE', term)
+         .orWhere(db.raw('CAST(users.id AS TEXT)'), 'ILIKE', term);
       });
     }
 
     if (status) {
-      query.where('users.status', status.toUpperCase());
+      if (status.toUpperCase() === 'BANNED') {
+        query.whereIn(db.raw('UPPER(users.status)'), ['BANNED', 'DISABLED', 'LOCKED']);
+      } else {
+        query.where(db.raw('UPPER(users.status)'), status.toUpperCase());
+      }
     }
 
     if (roleId) {
-      query.whereIn('users.id', db('user_roles').select('user_id').where({ role_id: roleId }));
+      query.where('user_roles.role_id', roleId);
     }
 
     if (provider) {
-      query.where('users.provider', provider.toLowerCase());
+      if (provider.toLowerCase() === 'google') {
+        query.where(function() {
+          this.whereRaw("LOWER(users.provider) = 'google'")
+              .orWhereNotNull('users.google_id')
+              .orWhereIn('users.id', db('user_oauth_accounts').select('user_id').whereRaw("LOWER(provider) = 'google'"));
+        });
+      } else {
+        query.where(db.raw('LOWER(users.provider)'), provider.toLowerCase());
+      }
     }
 
     if (verified !== undefined && verified !== null) {
       const isVerified = verified === 'true' || verified === true;
       if (isVerified) {
-        query.whereNot('users.status', 'PENDING_VERIFICATION');
+        query.whereNot(db.raw('UPPER(users.status)'), 'PENDING_VERIFICATION');
       } else {
-        query.where('users.status', 'PENDING_VERIFICATION');
+        query.where(db.raw('UPPER(users.status)'), 'PENDING_VERIFICATION');
       }
     }
 
@@ -64,24 +79,78 @@ export const AdminUserService = {
       query.where('users.created_at', '<=', new Date(endDate));
     }
 
-    const countQuery = query.clone().count('* as total').first();
+    const countQuery = query.clone().clearSelect().countDistinct('users.id as total').first();
 
-    const [countResult, users] = await Promise.all([
+    const [countResult, users, globalTotalResult, activeResult, pendingResult, bannedResult, googleResult, adminResult] = await Promise.all([
       countQuery,
       query.clone()
-        .select('users.id', 'users.email', 'users.name', 'users.avatar_url', 'users.provider', 'users.status', 'users.created_at', 'users.last_login_at', 'users.failed_login_count')
+        .leftJoin('user_oauth_accounts', 'users.id', 'user_oauth_accounts.user_id')
+        .select(
+          'users.id', 
+          'users.email', 
+          'users.name', 
+          'users.avatar_url', 
+          'users.provider', 
+          'users.google_id',
+          'user_oauth_accounts.provider as oauth_provider',
+          'roles.name as role', 
+          'user_roles.role_id', 
+          'users.status', 
+          'users.created_at', 
+          'users.updated_at', 
+          'users.last_login_at', 
+          'users.failed_login_count'
+        )
         .orderBy(`users.${sort}`, order)
         .limit(parsedLimit)
-        .offset(offset)
+        .offset(offset),
+      db('users').count('* as total').first(),
+      db('users').whereRaw("UPPER(status) = 'ACTIVE'").count('* as total').first(),
+      db('users').whereRaw("UPPER(status) = 'PENDING_VERIFICATION'").count('* as total').first(),
+      db('users').whereRaw("UPPER(status) IN ('BANNED', 'DISABLED', 'LOCKED')").count('* as total').first(),
+      db('users').where(function() {
+        this.whereRaw("LOWER(users.provider) = 'google'")
+            .orWhereNotNull('users.google_id')
+            .orWhereIn('users.id', db('user_oauth_accounts').select('user_id').whereRaw("LOWER(provider) = 'google'"));
+      }).countDistinct('users.id as total').first(),
+      db('user_roles')
+        .leftJoin('roles', 'user_roles.role_id', 'roles.id')
+        .whereRaw("LOWER(roles.name) LIKE '%admin%'")
+        .countDistinct('user_roles.user_id as total').first()
     ]);
 
     const total = Number(countResult?.total || 0);
+    const globalTotal = Number(globalTotalResult?.total || 0);
+    const activeCount = Number(activeResult?.total || 0);
+    const pendingCount = Number(pendingResult?.total || 0);
+    const bannedCount = Number(bannedResult?.total || 0);
+    const googleCount = Number(googleResult?.total || 0);
+    const adminCount = Number(adminResult?.total || 0);
+
+    const enrichedUsers = users.map((u) => {
+      const isGoogle = (u.provider || '').toLowerCase() === 'google' || !!u.google_id || (u.oauth_provider || '').toLowerCase() === 'google';
+      return {
+        ...u,
+        provider: isGoogle ? 'google' : (u.provider || 'local'),
+        avatar_source: u.avatar_url && u.avatar_url.startsWith('/uploads/avatars/')
+          ? 'custom'
+          : (u.avatar_url && (u.avatar_url.includes('google') || isGoogle) ? 'google' : 'default')
+      };
+    });
 
     return {
       total,
       limit: parsedLimit,
       page: parsedPage,
-      users
+      summary: {
+        total: globalTotal,
+        active: activeCount,
+        pending: pendingCount,
+        banned: bannedCount,
+        google: googleCount,
+        admins: adminCount
+      },
+      users: enrichedUsers
     };
   },
 
@@ -98,7 +167,7 @@ export const AdminUserService = {
       UserProfileService.getEnrichedProfile(userId),
       SessionService.getActiveSessions(userId),
       db('login_history').where({ user_id: userId }).orderBy('attempted_at', 'desc').limit(20),
-      db('audit_logs').where({ target_user_id: userId }).orderBy('occurred_at', 'desc').limit(20),
+      db('audit_logs').where({ target_user_id: userId }).orderBy('created_at', 'desc').limit(20),
       OAuthRepository.findByUser(userId),
       PermissionService.getUserPermissions(userId)
     ]);
@@ -106,7 +175,10 @@ export const AdminUserService = {
     const { password_hash, ...safeUser } = user;
 
     return {
-      user: safeUser,
+      user: {
+        ...safeUser,
+        avatar_source: profile.avatar_source || 'default'
+      },
       profile: profile.profile,
       preferences: profile.preferences,
       roles: userPerms.roles,

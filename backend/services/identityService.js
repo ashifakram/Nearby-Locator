@@ -17,12 +17,23 @@ export const IdentityService = {
    * @returns {Promise<Object>} Created user entity
    */
   async createIdentity(identityData, executor) {
-    return UserRepository.createUser({
+    const payload = {
       email: identityData.email,
       password_hash: identityData.passwordHash,
       status: identityData.status,
       role_id: identityData.roleId
-    }, executor);
+    };
+    if (identityData.name) {
+      payload.name = identityData.name;
+    }
+    if (identityData.avatar_url) {
+      payload.avatar_url = identityData.avatar_url;
+    }
+    if (identityData.agreed_to_terms !== undefined) {
+      payload.agreed_to_terms = identityData.agreed_to_terms;
+      payload.agreed_to_terms_at = identityData.agreed_to_terms_at;
+    }
+    return UserRepository.createUser(payload, executor);
   },
 
   /**

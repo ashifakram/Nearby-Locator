@@ -18,6 +18,8 @@ import {
   updatePreferences,
   getPrivacy,
   updatePrivacy,
+  getCookieConsent,
+  updateCookieConsent,
   getNotificationSettings,
   updateNotificationSettings,
   exportAccount,
@@ -74,6 +76,8 @@ router.patch('/preferences', authJwt, validatePreferences, updatePreferences);
 router.get('/privacy', authJwt, getPrivacy);
 router.put('/privacy', authJwt, validatePrivacy, updatePrivacy);
 router.patch('/privacy', authJwt, validatePrivacy, updatePrivacy);
+router.get('/privacy/cookie-consent', authJwt, getCookieConsent);
+router.put('/privacy/cookie-consent', authJwt, updateCookieConsent);
 
 router.get('/notifications/settings', authJwt, getNotificationSettings);
 router.put('/notifications/settings', authJwt, validateNotifications, updateNotificationSettings);

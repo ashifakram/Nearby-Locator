@@ -191,6 +191,42 @@ paths:
   /users/delete:
     $ref: './paths/users.yaml#/DeleteUser'
 
+  # Cookie Consent User Preferences
+  /users/privacy/cookie-consent:
+    $ref: './paths/users.yaml#/CookieConsent'
+
+  # Public Newsletter Subscription
+  /newsletter/subscribe:
+    $ref: './paths/newsletter.yaml#/Subscribe'
+  /newsletter/unsubscribe:
+    $ref: './paths/newsletter.yaml#/Unsubscribe'
+
+  # Public Contact submissions
+  /contact/submit:
+    $ref: './paths/contact.yaml#/Submit'
+
+  # Admin Newsletter Management
+  /admin/newsletter/subscribers:
+    $ref: './paths/admin.yaml#/AdminNewsletterSubscribers'
+  /admin/newsletter/subscribers/{id}:
+    $ref: './paths/admin.yaml#/AdminNewsletterSubscribers'
+  /admin/newsletter/stats:
+    $ref: './paths/admin.yaml#/AdminNewsletterStats'
+  /admin/newsletter/export:
+    $ref: './paths/admin.yaml#/AdminNewsletterExport'
+
+  # Admin Contact submission management
+  /admin/contact/stats:
+    $ref: './paths/admin.yaml#/AdminContactStats'
+  /admin/contact/submissions:
+    $ref: './paths/admin.yaml#/AdminContactSubmissions'
+  /admin/contact/submissions/{id}:
+    $ref: './paths/admin.yaml#/AdminContactSubmissionDetail'
+
+  # Admin Privacy/Cookie analytics stats
+  /admin/privacy/cookie-consent/stats:
+    $ref: './paths/admin.yaml#/AdminCookieConsentStats'
+
 components:
   securitySchemes:
     $ref: './components/securitySchemes.yaml'

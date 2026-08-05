@@ -1,5 +1,5 @@
 import { api } from './api';
-import { setInMemoryAccessToken } from './tokenOrchestrator';
+import { setInMemoryAccessToken, getInMemoryAccessToken, executeTokenRefreshMutex } from './tokenOrchestrator';
 import { useAuthStore } from '../store/useAuthStore';
 import { logger } from '../utils/logger';
 
@@ -60,10 +60,10 @@ export const authService = {
     }
   },
 
-  signup: async (name, email, password, signal) => {
+  signup: async (name, email, password, agreed, signal) => {
     logger.info('Executing signup API request...');
     try {
-      const response = await api.post('/auth/signup', { name, email, password }, { signal });
+      const response = await api.post('/auth/signup', { name, email, password, agreed }, { signal });
       return response.data.data;
     } catch (err) {
       handleAuthError(err);
@@ -72,6 +72,13 @@ export const authService = {
 
   getProfile: async () => {
     logger.info('Executing getProfile session restoration request...');
+    if (!getInMemoryAccessToken()) {
+      try {
+        await executeTokenRefreshMutex();
+      } catch (_) {
+        // Silent catch: if refresh token cookie is missing/invalid, api.get will handle 401
+      }
+    }
     const response = await api.get('/users/profile');
     const payload = response.data.data;
     const userObj = payload?.user || payload;
@@ -82,13 +89,18 @@ export const authService = {
   },
 
   fetchUserPermissions: async (signal) => {
-    useAuthStore.getState().setPermissionLoading();
+    const currentState = useAuthStore.getState().permissionState;
+    if (currentState !== 'READY') {
+      useAuthStore.getState().setPermissionLoading();
+    }
     try {
       const permRes = await api.get('/users/me/permissions', { signal });
       const { roles, permissions, permissionVersion } = permRes.data?.data || {};
       useAuthStore.getState().setPermissions(roles, permissions, permissionVersion);
     } catch (e) {
-      useAuthStore.getState().setPermissionFailed();
+      if (currentState !== 'READY') {
+        useAuthStore.getState().setPermissionFailed();
+      }
       logger.error('Failed to sync permissions from backend', e);
     }
   },

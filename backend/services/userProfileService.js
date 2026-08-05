@@ -1,9 +1,28 @@
 import { UserRepository } from '../repositories/userRepository.js';
 import { UserProfileRepository } from '../repositories/userProfileRepository.js';
 import { UserPreferencesRepository } from '../repositories/userPreferencesRepository.js';
+import { OAuthRepository } from '../repositories/oauthRepository.js';
 import { AvatarStorageService } from './avatarStorageService.js';
 import { ValidationError, NotFoundError, ConflictError } from '../utils/errors.js';
 import { withTransaction } from '../utils/dbRetry.js';
+
+/**
+ * Computes dynamic avatar source without requiring schema changes.
+ * Priority: custom (local file) -> google/oauth -> default
+ */
+export function computeAvatarSource(avatarUrl, oauthAccounts = []) {
+  if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.startsWith('/uploads/avatars/')) {
+    return 'custom';
+  }
+  const googleAccount = oauthAccounts.find(acc => acc.provider === 'google' && acc.metadata?.picture);
+  if (avatarUrl && googleAccount && avatarUrl === googleAccount.metadata.picture) {
+    return 'google';
+  }
+  if (avatarUrl && typeof avatarUrl === 'string' && (avatarUrl.includes('googleusercontent.com') || avatarUrl.startsWith('http'))) {
+    return 'google';
+  }
+  return 'default';
+}
 
 /**
  * UserProfileService: Handles user profile business logic, personal information enrichment,
@@ -12,7 +31,7 @@ import { withTransaction } from '../utils/dbRetry.js';
 export const UserProfileService = {
   /**
    * Retrieves enriched profile details combining users core entity, personal information profile,
-   * and preferences.
+   * preferences, and computed avatar source.
    */
   async getEnrichedProfile(userId, executor) {
     const user = await UserRepository.findById(userId, executor);
@@ -20,15 +39,18 @@ export const UserProfileService = {
       throw new NotFoundError('User account not found.');
     }
 
-    const [profile, preferences] = await Promise.all([
+    const [profile, preferences, oauthAccounts] = await Promise.all([
       UserProfileRepository.findByUserId(userId, executor),
-      UserPreferencesRepository.findByUserId(userId, executor)
+      UserPreferencesRepository.findByUserId(userId, executor),
+      OAuthRepository.findByUser(userId, executor).catch(() => [])
     ]);
 
     const { password_hash, ...safeUser } = user;
+    const avatarSource = computeAvatarSource(user.avatar_url, oauthAccounts);
 
     return {
       ...safeUser,
+      avatar_source: avatarSource,
       profile: profile || {
         first_name: null,
         last_name: null,
@@ -168,12 +190,12 @@ export const UserProfileService = {
       // Persist new avatar URL on users table
       await UserRepository.updateIdentity(userId, { avatar_url: newAvatarUrl }, executor);
 
-      return { avatar_url: newAvatarUrl };
+      return { avatar_url: newAvatarUrl, avatar_source: 'custom' };
     });
   },
 
   /**
-   * Deletes custom avatar image and resets to null.
+   * Deletes custom avatar image file. Automatically restores Google OAuth avatar URL if present.
    */
   async deleteAvatar(userId) {
     return await withTransaction(async (executor) => {
@@ -184,10 +206,18 @@ export const UserProfileService = {
 
       if (user.avatar_url) {
         await AvatarStorageService.deleteAvatarFile(user.avatar_url);
-        await UserRepository.updateIdentity(userId, { avatar_url: null }, executor);
       }
 
-      return { avatar_url: null };
+      // Check if user has a connected OAuth provider with a profile picture
+      const oauthAccounts = await OAuthRepository.findByUser(userId, executor).catch(() => []);
+      const googleAccount = oauthAccounts.find(acc => acc.provider === 'google' && acc.metadata?.picture);
+      const restoredAvatarUrl = googleAccount?.metadata?.picture || null;
+      const restoredSource = restoredAvatarUrl ? 'google' : 'default';
+
+      await UserRepository.updateIdentity(userId, { avatar_url: restoredAvatarUrl }, executor);
+
+      return { avatar_url: restoredAvatarUrl, avatar_source: restoredSource };
     });
   }
 };
+

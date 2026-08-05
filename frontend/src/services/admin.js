@@ -1,14 +1,57 @@
 import { api } from './api';
 
 // ─── Users ────────────────────────────────────────────────────────────────────
-export const getAdminUsers = async ({ page = 1, limit = 20, search = '', sort = 'created_at', order = 'desc' } = {}) => {
-  const params = new URLSearchParams({ page, limit, ...(search && { search }), sort, order });
+export const getAdminUsers = async ({ page = 1, limit = 20, search = '', status = '', provider = '', sort = 'created_at', order = 'desc' } = {}) => {
+  const params = new URLSearchParams({ 
+    page, 
+    limit, 
+    ...(search && { search }), 
+    ...(status && { status }), 
+    ...(provider && { provider }), 
+    sort, 
+    order 
+  });
   const { data } = await api.get(`/admin/users?${params}`);
   return data.data;
 };
 
 export const suspendUser = async (userId, reason) => {
   const { data } = await api.post(`/admin/users/${userId}/suspend`, { reason });
+  return data;
+};
+
+export const unsuspendUser = async (userId) => {
+  const { data } = await api.post(`/admin/users/${userId}/unsuspend`);
+  return data;
+};
+
+export const disableUser = async (userId, reason) => {
+  const { data } = await api.post(`/admin/users/${userId}/disable`, { reason });
+  return data;
+};
+
+export const enableUser = async (userId) => {
+  const { data } = await api.post(`/admin/users/${userId}/enable`);
+  return data;
+};
+
+export const softDeleteUser = async (userId) => {
+  const { data } = await api.post(`/admin/users/${userId}/delete`);
+  return data;
+};
+
+export const restoreUser = async (userId) => {
+  const { data } = await api.post(`/admin/users/${userId}/restore`);
+  return data;
+};
+
+export const verifyUserEmail = async (userId) => {
+  const { data } = await api.post(`/admin/users/${userId}/verify-email`);
+  return data;
+};
+
+export const resendUserVerification = async (userId) => {
+  const { data } = await api.post(`/admin/users/${userId}/resend-verification`);
   return data;
 };
 
@@ -27,15 +70,20 @@ export const updateUserRole = async (userId, roleId) => {
   return data;
 };
 
+export const getUserDetail = async (userId) => {
+  const { data } = await api.get(`/admin/users/${userId}`);
+  return data.data;
+};
+
 // ─── Roles & Permissions ──────────────────────────────────────────────────────
 export const listRoles = async () => {
   const { data } = await api.get('/admin/roles');
-  return data.data;
+  return data.data?.roles || data.data || [];
 };
 
 export const listPermissions = async () => {
   const { data } = await api.get('/admin/permissions');
-  return data.data;
+  return data.data?.permissions || data.data || [];
 };
 
 export const updateRolePermissions = async (roleId, permissionIds) => {
@@ -56,8 +104,8 @@ export const getAuditLogs = async ({ page = 1, limit = 50, search = '', severity
 };
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
-export const getSessions = async ({ page = 1, limit = 50, search = '' } = {}) => {
-  const params = new URLSearchParams({ page, limit, ...(search && { search }) });
+export const getSessions = async ({ page = 1, limit = 50, search = '', role = '' } = {}) => {
+  const params = new URLSearchParams({ page, limit, ...(search && { search }), ...(role && { role }) });
   const { data } = await api.get(`/admin/sessions?${params}`);
   return data.data;
 };
@@ -185,9 +233,34 @@ export const getSystemDiagnostics = async () => {
 
 // ─── CSV Download Helper ──────────────────────────────────────────────────────
 export const downloadCSV = async (endpoint, filename, extraParams = {}) => {
-  const params = new URLSearchParams({ export: 'csv', ...extraParams });
-  const response = await api.get(`${endpoint}?${params}`, { responseType: 'blob' });
-  const url = window.URL.createObjectURL(new Blob([response.data]));
+  // Strip leading /api prefix if present to avoid double /api/api in axios instance
+  const cleanEndpoint = endpoint.startsWith('/api/') ? endpoint.slice(4) : endpoint;
+
+  const cleanParams = {};
+  Object.keys(extraParams).forEach((key) => {
+    const val = extraParams[key];
+    if (val !== undefined && val !== null && val !== '') {
+      cleanParams[key] = val;
+    }
+  });
+
+  const params = new URLSearchParams({ export: 'csv', ...cleanParams });
+  const response = await api.get(`${cleanEndpoint}?${params}`, { responseType: 'blob' });
+
+  // Handle JSON error response wrapped in blob
+  if (response.data?.type === 'application/json') {
+    const text = await response.data.text();
+    let errObj = {};
+    try { errObj = JSON.parse(text); } catch (_) {}
+    throw new Error(errObj.message || 'Failed to export CSV');
+  }
+
+  // Create clean UTF-8 BOM blob for native Excel compatibility
+  const blob = response.data instanceof Blob 
+    ? response.data 
+    : new Blob(['\uFEFF', response.data], { type: 'text/csv;charset=utf-8;' });
+
+  const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);

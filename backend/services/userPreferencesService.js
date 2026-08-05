@@ -29,7 +29,7 @@ export const UserPreferencesService = {
         marketing_preferences: { email: false, in_app: true }
       },
       notification_settings: {
-        email_notifications: { marketing: false, security: true, updates: true },
+        email_notifications: { marketing: false, security: true, updates: true, weekly_digest: true },
         in_app_notifications: { mentions: true, activity: true },
         security_alerts: true
       }
@@ -101,5 +101,38 @@ export const UserPreferencesService = {
       await UserPreferencesRepository.upsertPreferences(userId, { notification_settings: updatedNotifications }, executor);
       return updatedNotifications;
     });
-  }
+  },
+
+  /**
+   * Retrieves cookie consent preferences for a user.
+   * Defaults: essential=true (always), functional=true, analytics=true
+   */
+  async getCookieConsent(userId) {
+    const row = await UserPreferencesRepository.findByUserId(userId);
+    const consent = row?.cookie_consent;
+    return {
+      essential: true, // always required, non-configurable
+      functional: consent?.functional !== undefined ? Boolean(consent.functional) : true,
+      analytics: consent?.analytics !== undefined ? Boolean(consent.analytics) : true,
+      saved_at: consent?.saved_at || null,
+    };
+  },
+
+  /**
+   * Saves user cookie consent selections.
+   * Essential cookies are always true — enforced server-side.
+   */
+  async updateCookieConsent(userId, { functional, analytics }) {
+    const payload = {
+      cookie_consent: {
+        essential: true,
+        functional: functional !== undefined ? Boolean(functional) : true,
+        analytics: analytics !== undefined ? Boolean(analytics) : true,
+        saved_at: new Date().toISOString(),
+      }
+    };
+    await UserPreferencesRepository.upsertPreferences(userId, payload);
+    return payload.cookie_consent;
+  },
 };
+

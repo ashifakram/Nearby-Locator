@@ -1,6 +1,24 @@
 {
+  "name": "nearby-locator",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:auth": "playwright test --project=chromium-noauth tests/e2e/auth.spec.ts",
+    "test:dashboard": "playwright test --project=chromium-auth tests/e2e/dashboard.spec.ts",
+    "test:discover": "playwright test --project=chromium-auth tests/e2e/discover.spec.ts",
+    "test:settings": "playwright test --project=chromium-auth tests/e2e/settings.spec.ts",
+    "test:admin": "playwright test --project=chromium-admin tests/e2e/admin.spec.ts",
+    "test:report": "playwright show-report"
+  },
   "dependencies": {
     "react-router-dom": "^7.15.1",
     "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.1.2"
   }
 }

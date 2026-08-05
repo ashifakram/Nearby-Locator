@@ -209,3 +209,34 @@ DeleteUser:
     responses:
       '200':
         description: Account deleted successfully
+
+CookieConsent:
+  get:
+    operationId: getCookieConsent
+    tags: [Users]
+    summary: Retrieve user's saved cookie consent preferences
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Cookie preferences retrieved successfully
+  put:
+    operationId: updateCookieConsent
+    tags: [Users]
+    summary: Update user's cookie consent preferences
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              functional:
+                type: boolean
+              analytics:
+                type: boolean
+    responses:
+      '200':
+        description: Cookie preferences updated successfully

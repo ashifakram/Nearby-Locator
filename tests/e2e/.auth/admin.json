@@ -1,0 +1,35 @@
+{
+  "cookies": [
+    {
+      "name": "g_state",
+      "value": "{\"i_l\":0,\"i_ll\":1785827399471,\"i_b\":\"HIf3OJvCkKwwm8rhFRwohqGDvFTuYbp771/MgyAiSso\",\"i_e\":{\"enable_itp_optimization\":24},\"i_et\":1785827399471}",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1801379399,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "refreshToken",
+      "value": "39734235a9cde8f10070ec94cefa2585dce37487f730ba7c4621dad7dcf8e96e",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1786432202.350617,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "accessToken",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2MmUxMWE4My1iMTRhLTQzNzQtODMzZC0wYjEzYmE5YmI0NDAiLCJzaWQiOiIxODVmMzk2NC02ZWMyLTRkNDktYmY1NS04MTE0MGE2NjFlZTYiLCJhbXIiOlsicHdkIl0sImlhdCI6MTc4NTgyNzQwMiwiZXhwIjoxNzg1ODI4MzAyfQ.VCxryp-4UFx4BDGQv9NTqA-kafRDr200bsBsk5pSlN8"
+        }
+      ]
+    }
+  ]
+}

@@ -9,9 +9,10 @@ export default function AdminDataTable({
   isLoading,
   error,
   page,
-  limit,
+  limit = 10,
   total,
   onPageChange,
+  onLimitChange,
   onRowClick,
   sortField,
   sortDirection,
@@ -31,33 +32,36 @@ export default function AdminDataTable({
   }
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col h-full min-h-[400px] font-sans">
-      <div className="overflow-x-auto flex-grow">
+    <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col font-sans">
+      <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-          <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-400 font-bold border-b border-slate-200/80 dark:border-slate-800">
+          <thead className="bg-slate-50/90 dark:bg-slate-800/90 text-[11px] uppercase tracking-wider text-slate-400 dark:text-slate-400 font-bold border-b border-slate-200/80 dark:border-slate-800">
             <tr>
-              {columns.map((col, idx) => (
-                <th 
-                  key={idx} 
-                  className={`px-6 py-4 ${col.align === 'right' ? 'text-right' : ''} ${col.sortable ? 'cursor-pointer select-none hover:text-blue-600 hover:bg-slate-100/50 dark:hover:bg-slate-800 transition-colors' : ''}`}
-                  onClick={() => {
-                    if (col.sortable && onSort) {
-                      const newDir = sortField === col.accessor && sortDirection === 'desc' ? 'asc' : 'desc';
-                      onSort(col.accessor, newDir);
-                    }
-                  }}
-                >
-                  <div className={`flex items-center gap-1.5 ${col.align === 'right' ? 'justify-end' : ''}`}>
-                    {col.header}
-                    {col.sortable && (
-                      <span className="flex flex-col text-[8px] opacity-60">
-                        <span className={sortField === col.accessor && sortDirection === 'asc' ? 'text-blue-600 font-black' : 'text-slate-300'}>▲</span>
-                        <span className={sortField === col.accessor && sortDirection === 'desc' ? 'text-blue-600 font-black -mt-1' : 'text-slate-300 -mt-1'}>▼</span>
-                      </span>
-                    )}
-                  </div>
-                </th>
-              ))}
+              {columns.map((col, idx) => {
+                const isActions = col.header === 'Actions' || col.accessor === 'actions';
+                return (
+                  <th 
+                    key={idx} 
+                    className={`px-4 py-3 sm:px-5 sm:py-3.5 ${col.align === 'right' || isActions ? 'text-right' : ''} ${col.sortable ? 'cursor-pointer select-none hover:text-blue-600 hover:bg-slate-100/50 dark:hover:bg-slate-800 transition-colors' : ''} ${isActions ? 'sticky right-0 bg-slate-50/90 dark:bg-slate-800/90 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)] z-20' : ''}`}
+                    onClick={() => {
+                      if (col.sortable && onSort) {
+                        const newDir = sortField === col.accessor && sortDirection === 'desc' ? 'asc' : 'desc';
+                        onSort(col.accessor, newDir);
+                      }
+                    }}
+                  >
+                    <div className={`flex items-center gap-1.5 ${col.align === 'right' || isActions ? 'justify-end' : ''}`}>
+                      {col.header}
+                      {col.sortable && (
+                        <span className="flex flex-col text-[8px] opacity-60">
+                          <span className={sortField === col.accessor && sortDirection === 'asc' ? 'text-blue-600 font-black' : 'text-slate-300'}>▲</span>
+                          <span className={sortField === col.accessor && sortDirection === 'desc' ? 'text-blue-600 font-black -mt-1' : 'text-slate-300 -mt-1'}>▼</span>
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -65,7 +69,7 @@ export default function AdminDataTable({
               Array.from({ length: Math.min(limit || 5, 8) }).map((_, idx) => (
                 <tr key={idx} className="animate-pulse">
                   {columns.map((_, colIdx) => (
-                    <td key={colIdx} className="px-6 py-4">
+                    <td key={colIdx} className="px-4 py-3.5">
                       <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-md w-3/4"></div>
                     </td>
                   ))}
@@ -90,13 +94,19 @@ export default function AdminDataTable({
                 <tr 
                   key={row.id || rowIdx} 
                   onClick={() => onRowClick && onRowClick(row)}
-                  className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60' : 'hover:bg-slate-50/40 dark:hover:bg-slate-800/30'}`}
+                  className={`group transition-colors ${onRowClick ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60' : 'hover:bg-slate-50/40 dark:hover:bg-slate-800/30'}`}
                 >
-                  {columns.map((col, colIdx) => (
-                    <td key={colIdx} className={`px-6 py-4 whitespace-nowrap align-middle text-slate-700 dark:text-slate-300 ${col.align === 'right' ? 'text-right' : ''}`}>
-                      {col.render ? col.render(row) : row[col.accessor]}
-                    </td>
-                  ))}
+                  {columns.map((col, colIdx) => {
+                    const isActions = col.header === 'Actions' || col.accessor === 'actions';
+                    return (
+                      <td 
+                        key={colIdx} 
+                        className={`px-4 py-3 sm:px-5 sm:py-3.5 whitespace-nowrap align-middle text-slate-700 dark:text-slate-300 ${col.align === 'right' || isActions ? 'text-right' : ''} ${isActions ? 'sticky right-0 bg-white group-hover:bg-slate-50 dark:bg-slate-900 dark:group-hover:bg-slate-800/60 shadow-[-8px_0_12px_-4px_rgba(0,0,0,0.06)] z-10' : ''}`}
+                      >
+                        {col.render ? col.render(row) : row[col.accessor]}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}
@@ -104,26 +114,52 @@ export default function AdminDataTable({
         </table>
       </div>
 
-      {!isLoading && total > limit && onPageChange && (
-        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/50 mt-auto">
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            Showing <span className="font-bold text-slate-700 dark:text-slate-200">{((page - 1) * limit) + 1}</span> to <span className="font-bold text-slate-700 dark:text-slate-200">{Math.min(page * limit, total)}</span> of <span className="font-bold text-slate-700 dark:text-slate-200">{total}</span>
-          </span>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => onPageChange(Math.max(1, page - 1))}
-              disabled={page === 1}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
-            >
-              <ChevronLeftIcon width={16} height={16} />
-            </button>
-            <button 
-              onClick={() => onPageChange(Math.min(Math.ceil(total / limit), page + 1))}
-              disabled={page >= Math.ceil(total / limit)}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
-            >
-              <ChevronRightIcon width={16} height={16} />
-            </button>
+      {!isLoading && onPageChange && total > 0 && (
+        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/80 dark:bg-slate-800/50 mt-auto font-sans">
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Showing <span className="font-bold text-slate-700 dark:text-slate-200">{Math.min(((page - 1) * limit) + 1, total)}</span> to <span className="font-bold text-slate-700 dark:text-slate-200">{Math.min(page * limit, total)}</span> of <span className="font-bold text-slate-700 dark:text-slate-200">{total}</span>
+            </span>
+            
+            {onLimitChange && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold">
+                <span>Per page:</span>
+                <select
+                  value={limit}
+                  onChange={(e) => onLimitChange(Number(e.target.value))}
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer focus:border-blue-600"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-400">
+              Page <span className="text-slate-700 dark:text-slate-200 font-extrabold">{page}</span> of <span className="text-slate-700 dark:text-slate-200 font-extrabold">{Math.max(1, Math.ceil(total / limit))}</span>
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={() => onPageChange(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+                title="Previous Page"
+              >
+                <ChevronLeftIcon width={16} height={16} />
+              </button>
+              <button 
+                onClick={() => onPageChange(Math.min(Math.ceil(total / limit), page + 1))}
+                disabled={page >= Math.ceil(total / limit)}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+                title="Next Page"
+              >
+                <ChevronRightIcon width={16} height={16} />
+              </button>
+            </div>
           </div>
         </div>
       )}

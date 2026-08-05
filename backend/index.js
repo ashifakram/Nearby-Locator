@@ -94,6 +94,8 @@ import spotRouter from './routes/spotRoutes.js';
 import notificationRouter from './routes/notificationRoutes.js';
 import discoveryRouter from './routes/discoveryRoutes.js';
 import moderationRouter from './routes/moderationRoutes.js';
+import newsletterRouter from './routes/newsletterRoutes.js';
+import contactRouter from './routes/contactRoutes.js';
 import { authJwt } from './middleware/authJwt.js';
 import { requirePermission } from './middleware/requirePermission.js';
 import { analyticsTracker } from './middleware/analyticsTracker.js';
@@ -112,6 +114,7 @@ app.get('/metrics', async (req, res) => {
 });
 
 app.use('/health', healthRouter);
+app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/admin', adminRouter);
@@ -119,6 +122,8 @@ app.use('/api/spots', spotRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/discovery', discoveryRouter);
 app.use('/api/moderation', moderationRouter);
+app.use('/api/newsletter', newsletterRouter);
+app.use('/api/contact', contactRouter);
 
 // Admin analytics dashboard — layered access: JWT + requirePermission + loopback/token (in controller)
 app.get('/api/admin/analytics/dashboard', authJwt, requirePermission('metrics.read'), getAnalyticsDashboard);

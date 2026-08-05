@@ -27,7 +27,7 @@ export class CsvBuilder {
       }).join(',');
     });
 
-    return [headers, ...rows].join('\n') + '\n';
+    return '\uFEFF' + [headers, ...rows].join('\n') + '\n';
   }
 
   /**

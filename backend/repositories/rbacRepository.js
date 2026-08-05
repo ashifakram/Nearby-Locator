@@ -39,7 +39,7 @@ export const RbacRepository = {
    * Retrieves a role by name.
    */
   async getRoleByName(roleName, executor = db) {
-    return await executor('roles').where('name', roleName).first();
+    return await executor('roles').whereRaw('LOWER(name) = LOWER(?)', [roleName]).first();
   },
 
   /**

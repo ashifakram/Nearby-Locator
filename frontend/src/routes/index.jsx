@@ -218,7 +218,7 @@ export const router = createBrowserRouter([
           </AdminRoute>
         ),
         children: [
-          { path: '/admin', element: <Navigate to="/admin/operations/overview" replace /> },
+          { path: '/admin', element: <Navigate to="/admin/queues" replace /> },
           { path: '/admin/queues', element: <Suspense fallback={<SuspenseFallback />}><AdminQueuesPage /></Suspense> },
           { path: '/admin/users', element: <Suspense fallback={<SuspenseFallback />}><AdminUsersPage /></Suspense> },
           { path: '/admin/roles', element: <Suspense fallback={<SuspenseFallback />}><AdminRolesPage /></Suspense> },
@@ -238,6 +238,7 @@ export const router = createBrowserRouter([
               { path: 'audit-logs', element: <Suspense fallback={<SuspenseFallback />}><AuditLogsPage /></Suspense> },
               { path: 'auth-events', element: <Suspense fallback={<SuspenseFallback />}><AuthEventsPage /></Suspense> },
               { path: 'system-errors', element: <Suspense fallback={<SuspenseFallback />}><SystemErrorsPage /></Suspense> },
+              { path: 'sessions', element: <Suspense fallback={<SuspenseFallback />}><ActiveSessionsPage /></Suspense> },
               { path: 'active-sessions', element: <Suspense fallback={<SuspenseFallback />}><ActiveSessionsPage /></Suspense> }
             ]
           }

@@ -69,14 +69,21 @@ export const AuthenticationRepository = {
   async getAdminEvents({ search, eventCategory, eventType, limit = 50, offset = 0 }, executor = db) {
     try {
       return await withTransientRetry(async () => {
-        const query = executor('authentication_events').select('*');
+        const query = executor('authentication_events')
+          .leftJoin('users', 'authentication_events.user_id', 'users.id')
+          .select(
+            'authentication_events.*',
+            'users.email as user_email',
+            'users.name as user_name'
+          );
 
-        if (eventCategory) query.where({ event_category: eventCategory });
-        if (eventType) query.where({ event_type: eventType });
+        if (eventCategory) query.where('authentication_events.event_category', 'ILIKE', `%${eventCategory}%`);
+        if (eventType) query.where('authentication_events.event_type', 'ILIKE', `%${eventType}%`);
         if (search) {
           query.where(builder => {
-            builder.whereRaw('user_id::text = ?', [search])
-                   .orWhereRaw(`metadata->>'ipAddress' = ?`, [search]);
+            builder.where('users.email', 'ILIKE', `%${search}%`)
+                   .orWhere('authentication_events.event_type', 'ILIKE', `%${search}%`)
+                   .orWhereRaw(`authentication_events.metadata->>'ipAddress' ILIKE ?`, [`%${search}%`]);
           });
         }
 
@@ -84,7 +91,7 @@ export const AuthenticationRepository = {
 
         const [countResult, events] = await Promise.all([
           countQuery,
-          query.clone().orderBy('created_at', 'desc').limit(limit).offset(offset)
+          query.clone().orderBy('authentication_events.created_at', 'desc').limit(limit).offset(offset)
         ]);
 
         return {

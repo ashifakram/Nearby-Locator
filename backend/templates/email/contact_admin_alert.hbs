@@ -1,0 +1,38 @@
+{{! Internal admin alert email for new contact submissions }}
+<h1 style="color:#dc2626;">🎫 New Support Ticket</h1>
+<p>A new contact form submission has been received and requires attention.</p>
+
+<table style="width:100%; border-collapse:collapse; margin: 16px 0; background:#f8fafc; border-radius:8px; overflow:hidden;">
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b; border-bottom:1px solid #e2e8f0; width:35%;"><strong>Ticket ID</strong></td>
+    <td style="padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #e2e8f0; font-weight:bold; font-family:monospace;">{{ticketId}}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b; border-bottom:1px solid #e2e8f0;"><strong>Priority</strong></td>
+    <td style="padding:10px 14px; font-size:13px; border-bottom:1px solid #e2e8f0; font-weight:bold; color:#d97706; text-transform:uppercase;">{{priority}}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b; border-bottom:1px solid #e2e8f0;"><strong>From</strong></td>
+    <td style="padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #e2e8f0;">{{name}} &lt;{{email}}&gt;</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b; border-bottom:1px solid #e2e8f0;"><strong>Category</strong></td>
+    <td style="padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #e2e8f0;">{{categoryLabel}}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b; border-bottom:1px solid #e2e8f0;"><strong>Subject</strong></td>
+    <td style="padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #e2e8f0;">{{subject_line}}</td>
+  </tr>
+</table>
+
+<div style="margin: 16px 0; padding: 14px 16px; background:#f1f5f9; border-left: 4px solid #3b82f6; border-radius: 4px;">
+  <p style="font-size: 13px; color:#334155; margin:0; line-height:1.7;">{{message}}</p>
+</div>
+
+<div class="btn-container">
+  <a href="{{adminUrl}}" class="btn-primary">Open Admin Panel</a>
+</div>
+
+<p style="margin-top: 16px; font-size: 12px; color: #94a3b8;">
+  This is an automated internal notification from {{companyName}}.
+</p>

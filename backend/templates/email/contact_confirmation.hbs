@@ -1,0 +1,36 @@
+{{! Sent to the user who submitted the contact form }}
+<h1>We've received your message! 📬</h1>
+<p>Hi {{name}},</p>
+<p>Thank you for contacting <strong>{{companyName}}</strong>. We've received your support request and created a ticket for your inquiry.</p>
+
+<table style="width:100%; border-collapse:collapse; margin: 16px 0; background:#f8fafc; border-radius:8px; overflow:hidden;">
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b; border-bottom:1px solid #e2e8f0; width:40%;"><strong>Ticket ID</strong></td>
+    <td style="padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #e2e8f0; font-weight:bold;">{{ticketId}}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b; border-bottom:1px solid #e2e8f0;"><strong>Category</strong></td>
+    <td style="padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #e2e8f0;">{{categoryLabel}}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b; border-bottom:1px solid #e2e8f0;"><strong>Subject</strong></td>
+    <td style="padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #e2e8f0;">{{subject}}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 14px; font-size:12px; color:#64748b;"><strong>Expected Response</strong></td>
+    <td style="padding:10px 14px; font-size:13px; color:#1e293b;">{{responseTime}}</td>
+  </tr>
+</table>
+
+<p style="color:#475569; font-size:14px;">
+  Our support team will review your message and respond to <strong>{{email}}</strong> shortly.
+  Please keep your ticket ID handy for any follow-up communications.
+</p>
+
+<div class="btn-container">
+  <a href="{{appUrl}}/help" class="btn-primary">Visit Help Center</a>
+</div>
+
+<p style="margin-top: 24px; font-size: 13px; color: #94a3b8;">
+  If you did not submit this request, please ignore this email or contact us at {{supportEmail}}.
+</p>

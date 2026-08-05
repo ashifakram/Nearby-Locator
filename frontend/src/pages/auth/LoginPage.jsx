@@ -69,7 +69,11 @@ export default function LoginPage() {
 
     try {
       await authService.login(data.email, data.password, abortControllerRef.current.signal);
-      navigate(from, { replace: true });
+      const userPermissions = useAuthStore.getState().permissions || [];
+      const userRoles = useAuthStore.getState().roles || [];
+      const isAdmin = userPermissions.includes('admin.access') || userRoles.some(r => /admin/i.test(r));
+      const targetPath = location.state?.from ? from : (isAdmin ? '/admin' : '/dashboard');
+      navigate(targetPath, { replace: true });
     } catch (err) {
       if (err.name === 'CanceledError') return;
       const code = err.code;

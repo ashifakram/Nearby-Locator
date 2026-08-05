@@ -23,7 +23,8 @@ import {
   getDashboardAnalytics,
   getAuthEventsAnalytics,
   getSystemErrorsAnalytics,
-  getAuditLogsAnalytics
+  getAuditLogsAnalytics,
+  getCookieConsentStats
 } from '../controllers/adminController.js';
 
 import {
@@ -53,6 +54,19 @@ import { getZeroResultQueries, getSearchQualityAnalytics } from '../controllers/
 import { getThreatTelemetry } from '../controllers/securityAnalyticsController.js';
 import { globalSearch } from '../controllers/globalSearchController.js';
 import { getSystemInfo } from '../controllers/systemController.js';
+import {
+  listSubscribers,
+  getStats as getNewsletterStats,
+  exportCsv as exportNewsletterCsv,
+  deleteSubscriber,
+} from '../controllers/newsletterController.js';
+import {
+  listSubmissions,
+  getSubmission,
+  updateSubmission,
+  getContactStats,
+  deleteSubmission as deleteContactSubmission,
+} from '../controllers/contactController.js';
 
 const router = express.Router();
 
@@ -149,5 +163,21 @@ router.put('/settings/:key', authJwt, requirePermission('settings.update'), sudo
 
 // System diagnostics
 router.get('/system/info', authJwt, requirePermission('metrics.read'), getSystemInfo);
+
+// Newsletter Subscriber Management
+router.get('/newsletter/stats', authJwt, requirePermission('users.read'), getNewsletterStats);
+router.get('/newsletter/subscribers', authJwt, requirePermission('users.read'), listSubscribers);
+router.get('/newsletter/export', authJwt, requirePermission('audit.export'), exportNewsletterCsv);
+router.delete('/newsletter/subscribers/:id', authJwt, requirePermission('users.delete'), deleteSubscriber);
+
+// Contact Submissions Management
+router.get('/contact/stats', authJwt, requirePermission('users.read'), getContactStats);
+router.get('/contact/submissions', authJwt, requirePermission('users.read'), listSubmissions);
+router.get('/contact/submissions/:id', authJwt, requirePermission('users.read'), getSubmission);
+router.patch('/contact/submissions/:id', authJwt, requirePermission('users.update'), updateSubmission);
+router.delete('/contact/submissions/:id', authJwt, requirePermission('users.delete'), deleteContactSubmission);
+
+// Cookie Consent stats
+router.get('/privacy/cookie-consent/stats', authJwt, requirePermission('metrics.read'), getCookieConsentStats);
 
 export default router;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check, Loader2 } from 'lucide-react';
 import { useToastStore } from '../../../store/useToastStore';
 
 export default function LandingFooter() {
@@ -9,15 +9,33 @@ export default function LandingFooter() {
   const { showToast } = useToastStore();
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubscribe = (e) => {
+  const handleSubscribe = async (e) => {
     e.preventDefault();
     if (!email || !email.includes('@')) {
       showToast('Please enter a valid email address.', 'error');
       return;
     }
-    setSubscribed(true);
-    showToast('Subscribed to Nearby Locator newsletter!', 'success');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSubscribed(true);
+        showToast(data.message, 'success');
+      } else {
+        showToast(data.message || 'Something went wrong. Please try again.', 'error');
+      }
+    } catch {
+      showToast('Network error. Please check your connection and try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -148,9 +166,14 @@ export default function LandingFooter() {
                 />
                 <button
                   type="submit"
-                  className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1"
+                  disabled={loading}
+                  className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1"
                 >
-                  Subscribe <ArrowRight className="w-3 h-3" />
+                  {loading ? (
+                    <><Loader2 className="w-3 h-3 animate-spin" /> Subscribing...</>
+                  ) : (
+                    <>Subscribe <ArrowRight className="w-3 h-3" /></>
+                  )}
                 </button>
               </form>
             )}

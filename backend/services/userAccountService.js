@@ -56,6 +56,13 @@ export const UserAccountService = {
       text: `Your email change verification code is ${otpResult.otpCode}. It expires in 15 minutes.`
     });
 
+    // Send security alert notification to current email address to prevent silent account takeover
+    await EmailService.sendEmail({
+      to: user.email,
+      subject: 'Security Alert: Email Address Change Requested',
+      text: `An email change request to ${normalizedNew} was initiated for your account. If you did not request this, please change your password immediately.`
+    }).catch(err => console.error('[SecurityAlert] Failed to send email change alert to old address:', err));
+
     return { message: 'Verification code sent to your new email address.', expiresAt: otpResult.expiresAt };
   },
 
@@ -77,6 +84,10 @@ export const UserAccountService = {
       }
 
       await UserRepository.updateEmail(userId, normalizedNew, executor);
+      
+      // Revoke active sessions on legacy tokens to enforce security isolation
+      await SessionService.revokeAllOtherSessions(userId, null, executor).catch(() => {});
+
       return { message: 'Email address updated successfully.', email: normalizedNew };
     });
   },

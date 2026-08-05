@@ -287,3 +287,107 @@ AnalyticsAuditLogs:
     responses:
       '200':
         description: Audit log metrics retrieved successfully
+
+AdminNewsletterSubscribers:
+  get:
+    operationId: listSubscribers
+    tags: [Admin]
+    summary: List all newsletter subscribers
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success
+  delete:
+    operationId: deleteSubscriber
+    tags: [Admin]
+    summary: Delete a newsletter subscriber
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success
+
+AdminNewsletterStats:
+  get:
+    operationId: getNewsletterStats
+    tags: [Admin]
+    summary: Get newsletter subscriber statistics
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success
+
+AdminNewsletterExport:
+  get:
+    operationId: exportNewsletterCsv
+    tags: [Admin]
+    summary: Export active newsletter subscribers to CSV
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: CSV file download
+
+AdminContactSubmissions:
+  get:
+    operationId: listContactSubmissions
+    tags: [Admin]
+    summary: List all contact submissions
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success
+
+AdminContactStats:
+  get:
+    operationId: getContactStats
+    tags: [Admin]
+    summary: Get contact submission statistics
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success
+
+AdminContactSubmissionDetail:
+  get:
+    operationId: getContactSubmission
+    tags: [Admin]
+    summary: Retrieve detailed contact submission ticket
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success
+  patch:
+    operationId: updateContactSubmission
+    tags: [Admin]
+    summary: Update contact submission status/notes
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success
+  delete:
+    operationId: deleteContactSubmission
+    tags: [Admin]
+    summary: Permanently delete a contact submission
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success
+
+AdminCookieConsentStats:
+  get:
+    operationId: getCookieConsentStats
+    tags: [Admin]
+    summary: Get aggregated cookie consent statistics
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Success

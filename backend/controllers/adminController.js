@@ -487,55 +487,95 @@ export const retentionOverride = async (req, res, next) => {
  */
 export const getUsers = async (req, res, next) => {
   try {
-    const { limit = 50, page = 1, search } = req.query;
+    const { limit = 50, page = 1, search, status, provider } = req.query;
 
     const { limit: parsedLimit, offset, page: parsedPage } = buildPaginationClause(req.query, 50, 100);
-    const { column, order } = buildSortClause(req.query, 'created_at', 'desc', ['created_at', 'name', 'email', 'status', 'role_id']);
+    const { column, order } = buildSortClause(req.query, 'created_at', 'desc', ['created_at', 'name', 'email', 'status']);
 
-    const query = db('users');
+    const query = db('users')
+      .leftJoin('user_roles', 'users.id', 'user_roles.user_id')
+      .leftJoin('roles', 'user_roles.role_id', 'roles.id');
 
     if (search) {
       query.where(builder => {
-        builder.where('email', 'ILIKE', `%${search}%`)
-               .orWhere('name', 'ILIKE', `%${search}%`)
-               .orWhere('id', search);
+        builder.where('users.email', 'ILIKE', `%${search}%`)
+               .orWhere('users.name', 'ILIKE', `%${search}%`)
+               .orWhere(db.raw('CAST(users.id AS TEXT)'), 'ILIKE', `%${search}%`);
       });
     }
 
+    if (status) {
+      if (status.toUpperCase() === 'BANNED') {
+        query.whereIn(db.raw('UPPER(users.status)'), ['BANNED', 'DISABLED', 'LOCKED']);
+      } else {
+        query.where(db.raw('UPPER(users.status)'), status.toUpperCase());
+      }
+    }
+
+    if (provider) {
+      query.where(db.raw('LOWER(users.provider)'), provider.toLowerCase());
+    }
+
     if (req.query.export === 'csv') {
-      const allUsers = await query.clone().select('id', 'email', 'name', 'provider', 'role_id', 'status', 'created_at').orderBy(column, order).limit(10000);
+      const allUsers = await query.clone().select('users.id', 'users.email', 'users.name', 'users.provider', 'roles.name as role', 'users.status', 'users.created_at', 'users.updated_at').orderBy(`users.${column}`, order).limit(10000);
       const csv = CsvBuilder.build(allUsers, [
         { header: 'ID', key: 'id' },
         { header: 'Email', key: 'email' },
         { header: 'Name', key: 'name' },
         { header: 'Provider', key: 'provider' },
-        { header: 'Role ID', key: 'role_id' },
+        { header: 'Role', key: 'role' },
         { header: 'Status', key: 'status' },
-        { header: 'Created At', key: 'created_at' }
+        { header: 'Created At', key: 'created_at' },
+        { header: 'Updated At', key: 'updated_at' }
       ]);
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="admin_users_export.csv"');
       await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'admin_users' } });
       return res.send(csv);
     }
 
-    const countQuery = query.clone().clearSelect().count('* as total').first();
+    const countQuery = query.clone().clearSelect().countDistinct('users.id as total').first();
 
-    const [countResult, users] = await Promise.all([
+    const [countResult, users, globalTotalResult, activeResult, pendingResult, bannedResult, googleResult, adminResult] = await Promise.all([
       countQuery,
       query.clone()
-        .select('id', 'email', 'name', 'provider', 'role_id', 'status', 'created_at')
-        .orderBy(column, order)
+        .select('users.id', 'users.email', 'users.name', 'users.avatar_url', 'users.provider', 'roles.name as role', 'user_roles.role_id', 'users.status', 'users.created_at', 'users.updated_at')
+        .orderBy(`users.${column}`, order)
         .limit(parsedLimit)
-        .offset(offset)
+        .offset(offset),
+      db('users').count('* as total').first(),
+      db('users').whereRaw("UPPER(status) = 'ACTIVE'").count('* as total').first(),
+      db('users').whereRaw("UPPER(status) = 'PENDING_VERIFICATION'").count('* as total').first(),
+      db('users').whereRaw("UPPER(status) IN ('BANNED', 'DISABLED', 'LOCKED')").count('* as total').first(),
+      db('users').where(function() {
+        this.whereRaw("LOWER(provider) = 'google'").orWhereNotNull('google_id');
+      }).count('* as total').first(),
+      db('user_roles')
+        .leftJoin('roles', 'user_roles.role_id', 'roles.id')
+        .whereRaw("LOWER(roles.name) LIKE '%admin%'")
+        .countDistinct('user_roles.user_id as total').first()
     ]);
 
     const total = Number(countResult?.total || 0);
+    const globalTotal = Number(globalTotalResult?.total || 0);
+    const activeCount = Number(activeResult?.total || 0);
+    const pendingCount = Number(pendingResult?.total || 0);
+    const bannedCount = Number(bannedResult?.total || 0);
+    const googleCount = Number(googleResult?.total || 0);
+    const adminCount = Number(adminResult?.total || 0);
 
     return sendSuccess(res, {
       total,
       limit: parsedLimit,
       page: parsedPage,
+      summary: {
+        total: globalTotal,
+        active: activeCount,
+        pending: pendingCount,
+        banned: bannedCount,
+        google: googleCount,
+        admins: adminCount
+      },
       users
     }, 'Users retrieved successfully');
   } catch (err) {
@@ -559,25 +599,42 @@ export const getAuditLogs = async (req, res, next) => {
     const maxSearchDate = new Date();
     maxSearchDate.setDate(maxSearchDate.getDate() - 90);
 
-    const query = db('audit_logs').where('occurred_at', '>=', maxSearchDate);
+    const query = db('audit_logs')
+      .leftJoin('users as actor', 'audit_logs.actor_id', 'actor.id')
+      .leftJoin('users as target', 'audit_logs.target_user_id', 'target.id')
+      .select(
+        'audit_logs.*',
+        'actor.email as actor_email',
+        'actor.name as actor_name',
+        'target.email as target_user_email'
+      )
+      .where('audit_logs.occurred_at', '>=', maxSearchDate);
 
-    if (action) query.where({ action });
-    if (actorId) query.where({ actor_id: actorId });
-    if (targetUserId) query.where({ target_user_id: targetUserId });
-    if (severity) query.where({ severity });
+    if (action) query.where('audit_logs.action', action);
+    if (actorId) query.where('audit_logs.actor_id', actorId);
+    if (targetUserId) query.where('audit_logs.target_user_id', targetUserId);
+    if (severity) query.where('audit_logs.severity', severity);
     
-    // Correlation ID or JSONB search
+    // Email, action, IP or correlation ID search
     if (search) {
-      query.whereRaw(`metadata->>'correlationId' = ?`, [search]);
+      query.where(builder => {
+        builder.where('actor.email', 'ILIKE', `%${search}%`)
+               .orWhere('target.email', 'ILIKE', `%${search}%`)
+               .orWhere('audit_logs.action', 'ILIKE', `%${search}%`)
+               .orWhere('audit_logs.ip_address', 'ILIKE', `%${search}%`)
+               .orWhereRaw(`audit_logs.metadata->>'correlationId' ILIKE ?`, [`%${search}%`]);
+      });
     }
 
     if (isExport === 'csv') {
       // Bounded massive export (max 10k rows)
-      const logs = await query.clone().select('*').orderBy('occurred_at', 'desc').limit(10000);
+      const logs = await query.clone().orderBy('audit_logs.occurred_at', 'desc').limit(10000);
       
       const csv = CsvBuilder.build(logs, [
         { header: 'ID', key: 'id' },
+        { header: 'Actor Email', key: 'actor_email' },
         { header: 'Actor ID', key: 'actor_id' },
+        { header: 'Target Email', key: 'target_user_email' },
         { header: 'Target User ID', key: 'target_user_id' },
         { header: 'Action', key: 'action' },
         { header: 'Severity', key: 'severity' },
@@ -586,7 +643,7 @@ export const getAuditLogs = async (req, res, next) => {
         { header: 'Metadata', key: 'metadata' }
       ]);
       
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="audit_logs_export.csv"');
       await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'audit_logs' } });
       return res.send(csv);
@@ -597,8 +654,7 @@ export const getAuditLogs = async (req, res, next) => {
     const [countResult, logs] = await Promise.all([
       countQuery,
       query.clone()
-        .select('*')
-        .orderBy('occurred_at', 'desc')
+        .orderBy('audit_logs.occurred_at', 'desc')
         .limit(parsedLimit)
         .offset(offset)
     ]);
@@ -625,19 +681,26 @@ export const getControlPlaneMetrics = async (req, res, next) => {
     // 1. Fetch active admin sessions from database (fully indexed joins)
     const activeAdminSessions = await db('user_sessions')
       .join('users', 'user_sessions.user_id', 'users.id')
-      .join('roles', 'users.role_id', 'roles.id')
+      .leftJoin('user_roles', 'users.id', 'user_roles.user_id')
+      .leftJoin('roles', 'user_roles.role_id', 'roles.id')
       .select('users.id as userId', 'users.email', 'roles.name as role', 'user_sessions.ip_address', 'user_sessions.id as sessionId')
       .where({ 'user_sessions.is_revoked': false, 'user_sessions.is_rotated': false })
       .whereIn('roles.name', ['Support Agent', 'Support Lead', 'Compliance', 'Super Admin', 'Admin']);
 
     // 2. Count active impersonations by scanning keys in Redis
     let impersonationCount = 0;
-    let cursor = 0;
-    do {
-      const scanResult = await client.scan(cursor, { MATCH: 'impersonation:active:*', COUNT: 100 });
-      cursor = Number(scanResult.cursor);
-      impersonationCount += scanResult.keys.length;
-    } while (cursor !== 0);
+    try {
+      if (client.isOpen) {
+        let cursor = 0;
+        do {
+          const scanResult = await client.scan(cursor, { MATCH: 'impersonation:active:*', COUNT: 100 });
+          cursor = Number(scanResult.cursor);
+          impersonationCount += scanResult.keys.length;
+        } while (cursor !== 0);
+      }
+    } catch (e) {
+      impersonationCount = 0;
+    }
 
     // 3. Scan suspicious concurrent admin sessions (distinct IPs)
     const adminSessionsGrouped = {};
@@ -721,7 +784,7 @@ export const getAuthEvents = async (req, res, next) => {
         { header: 'Metadata', key: 'metadata' }
       ]);
       
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="auth_events_export.csv"');
       await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'auth_events' } });
       return res.send(csv);
@@ -765,7 +828,7 @@ export const getSystemErrors = async (req, res, next) => {
         { header: 'Occurred At', key: 'occurred_at' }
       ]);
       
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="system_errors_export.csv"');
       await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'system_errors' } });
       return res.send(csv);
@@ -790,7 +853,7 @@ export const getSystemErrors = async (req, res, next) => {
  */
 export const getSessions = async (req, res, next) => {
   try {
-    const { search, export: isExport, limit = 50, page = 1 } = req.query;
+    const { search, role, export: isExport, limit = 50, page = 1 } = req.query;
     
     const parsedLimit = Math.min(Number(limit) || 50, 100);
     const parsedPage = Math.max(Number(page) || 1, 1);
@@ -798,7 +861,8 @@ export const getSessions = async (req, res, next) => {
 
     const query = db('user_sessions')
       .join('users', 'user_sessions.user_id', 'users.id')
-      .join('roles', 'users.role_id', 'roles.id')
+      .leftJoin('user_roles', 'users.id', 'user_roles.user_id')
+      .leftJoin('roles', 'user_roles.role_id', 'roles.id')
       .select(
         'user_sessions.id',
         'user_sessions.user_id',
@@ -809,7 +873,11 @@ export const getSessions = async (req, res, next) => {
         'user_sessions.created_at',
         'user_sessions.updated_at'
       )
-      .where({ 'user_sessions.is_revoked': false });
+      .where({ 'user_sessions.is_revoked': false, 'user_sessions.is_rotated': false });
+
+    if (role) {
+      query.where('roles.name', 'ILIKE', `%${role}%`);
+    }
 
     if (search) {
       query.where(builder => {
@@ -830,7 +898,7 @@ export const getSessions = async (req, res, next) => {
         { header: 'Created At', key: 'created_at' },
         { header: 'Last Active', key: 'updated_at' }
       ]);
-      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="active_sessions_export.csv"');
       await logAudit({ req, actorId: req.user.id, action: 'EXPORT_CSV', severity: 'INFO', metadata: { type: 'active_sessions' } });
       return res.send(csv);
@@ -901,10 +969,9 @@ export const revokeSession = async (req, res, next) => {
       return sendError(res, 404, 'Session not found');
     }
     
-    // Revoke using the existing service
-    await SessionService.revokeSession(session.id, session.user_id, req.user.id);
+    await db('user_sessions').where({ id }).update({ is_revoked: true, updated_at: db.fn.now() });
     
-    await logAudit(req, 'REVOKE_SESSION', session.user_id, 'WARNING', { sessionId: session.id, reason: 'Admin revoked session' });
+    await logAudit({ req, actorId: req.user?.id, action: 'REVOKE_SESSION', severity: 'WARNING', metadata: { sessionId: session.id, reason: 'Admin revoked session' } });
     return sendSuccess(res, null, 'Session revoked successfully');
   } catch (err) {
     next(err);
@@ -918,9 +985,39 @@ export const revokeSession = async (req, res, next) => {
 export const revokeUserSessions = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    await SessionService.revokeAllSessions(userId, req.user.id);
-    await logAudit(req, 'REVOKE_ALL_SESSIONS', userId, 'WARNING', { reason: 'Admin revoked all sessions' });
+    await db('user_sessions').where({ user_id: userId, is_revoked: false }).update({ is_revoked: true, updated_at: db.fn.now() });
+    await logAudit({ req, actorId: req.user?.id, action: 'REVOKE_ALL_SESSIONS', severity: 'WARNING', metadata: { targetUserId: userId, reason: 'Admin revoked all sessions' } });
     return sendSuccess(res, null, 'All sessions revoked successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 16. GET /api/admin/privacy/cookie-consent/stats
+ * Retrieves aggregated cookie preference stats.
+ */
+export const getCookieConsentStats = async (req, res, next) => {
+  try {
+    const totalConsents = await db('user_preferences').whereNotNull('cookie_consent').count('user_id as count').first();
+    
+    const functionalConsents = await db('user_preferences')
+      .whereNotNull('cookie_consent')
+      .whereRaw("(cookie_consent->>'functional')::boolean = true")
+      .count('user_id as count')
+      .first();
+      
+    const analyticsConsents = await db('user_preferences')
+      .whereNotNull('cookie_consent')
+      .whereRaw("(cookie_consent->>'analytics')::boolean = true")
+      .count('user_id as count')
+      .first();
+
+    return sendSuccess(res, {
+      total: parseInt(totalConsents.count, 10),
+      functional: parseInt(functionalConsents.count, 10),
+      analytics: parseInt(analyticsConsents.count, 10)
+    }, 'Cookie consent statistics retrieved');
   } catch (err) {
     next(err);
   }

@@ -1,0 +1,40 @@
+Subscribe:
+  post:
+    operationId: subscribeNewsletter
+    tags: [Newsletter]
+    summary: Subscribe an email to the newsletter updates
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email:
+                type: string
+                format: email
+    responses:
+      '200':
+        description: Subscribed successfully
+      '422':
+        description: Invalid inputs or validations failed
+
+Unsubscribe:
+  get:
+    operationId: unsubscribeNewsletter
+    tags: [Newsletter]
+    summary: Unsubscribe from the newsletter via token link
+    security: []
+    parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Unsubscribed successfully
+      '400':
+        description: Invalid or expired token

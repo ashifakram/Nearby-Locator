@@ -51,3 +51,6 @@ backend/scratch_*.js
 backend/seed_*.js
 backend/test_verification.js
 backend/verify.js
+backend/reset_admin.cjs
+playwright-report/
+test-results/

@@ -1,0 +1,31 @@
+Submit:
+  post:
+    operationId: submitContactInquiry
+    tags: [Contact]
+    summary: Submit a contact form inquiry ticket
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name, email, category, subject, message]
+            properties:
+              name:
+                type: string
+              email:
+                type: string
+                format: email
+              category:
+                type: string
+                enum: [general, technical, billing, privacy, partnerships]
+              subject:
+                type: string
+              message:
+                type: string
+    responses:
+      '201':
+        description: Inquiry ticket created successfully
+      '422':
+        description: Validation failed

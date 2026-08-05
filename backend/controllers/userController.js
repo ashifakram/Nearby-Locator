@@ -114,8 +114,20 @@ export const verifyEmailChange = async (req, res, next) => {
 export const changePassword = async (req, res, next) => {
   try {
     const userId = req.user.id;
+    const currentSessionId = req.user.sid || req.user.sessionId;
     const { currentPassword, newPassword } = req.body;
-    const result = await AuthenticationService.changePassword(userId, currentPassword, newPassword);
+    const result = await AuthenticationService.changePassword(userId, currentSessionId, currentPassword, newPassword);
+
+    if (!result.success) {
+      const statusCode = result.error?.code === 'INVALID_CREDENTIALS' ? 401 : 400;
+      return res.status(statusCode).json({
+        success: false,
+        status: statusCode,
+        message: result.error?.message || 'Password change failed',
+        data: null,
+        error: result.error || null
+      });
+    }
 
     await logAudit({
       req,
@@ -244,7 +256,44 @@ export const updatePreferences = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const updated = await UserPreferencesService.updatePreferences(userId, req.body);
+    
+    await logAudit({
+      req,
+      actorId: userId,
+      action: 'PREFERENCES_UPDATED',
+      severity: 'INFO'
+    });
+
     return sendSuccess(res, { preferences: updated }, 'Preferences updated');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getCookieConsent = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const consent = await UserPreferencesService.getCookieConsent(userId);
+    return sendSuccess(res, { consent }, 'Cookie consent preferences retrieved');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateCookieConsent = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { functional, analytics } = req.body;
+    const consent = await UserPreferencesService.updateCookieConsent(userId, { functional, analytics });
+
+    await logAudit({
+      req,
+      actorId: userId,
+      action: 'COOKIE_CONSENT_UPDATED',
+      severity: 'INFO'
+    });
+
+    return sendSuccess(res, { consent }, 'Cookie consent preferences updated');
   } catch (err) {
     next(err);
   }
@@ -264,6 +313,14 @@ export const updatePrivacy = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const updated = await UserPreferencesService.updatePrivacy(userId, req.body);
+
+    await logAudit({
+      req,
+      actorId: userId,
+      action: 'PRIVACY_SETTINGS_UPDATED',
+      severity: 'WARNING'
+    });
+
     return sendSuccess(res, { privacy: updated }, 'Privacy settings updated');
   } catch (err) {
     next(err);
@@ -284,6 +341,14 @@ export const updateNotificationSettings = async (req, res, next) => {
   try {
     const userId = req.user.id;
     const updated = await UserPreferencesService.updateNotificationSettings(userId, req.body);
+
+    await logAudit({
+      req,
+      actorId: userId,
+      action: 'NOTIFICATION_SETTINGS_UPDATED',
+      severity: 'INFO'
+    });
+
     return sendSuccess(res, { notifications: updated }, 'Notification settings updated');
   } catch (err) {
     next(err);

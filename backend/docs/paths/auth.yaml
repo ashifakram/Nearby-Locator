@@ -18,7 +18,9 @@ Signup:
                 type: string
               password:
                 type: string
-            required: [name, email, password]
+              agreed:
+                type: boolean
+            required: [name, email, password, agreed]
     responses:
       '201':
         description: Registration successful, user requires email verification
@@ -236,9 +238,9 @@ VerifyEmail:
   post:
     operationId: verifyEmail
     tags: [Auth]
-    summary: Verify user email using token
+    summary: Verify user email using 6-digit OTP code or verification token
     security: []
-    x-rate-limit: 5 requests per hour
+    x-rate-limit: 10 requests per minute
     requestBody:
       required: true
       content:
@@ -246,9 +248,15 @@ VerifyEmail:
           schema:
             type: object
             properties:
+              email:
+                type: string
+                example: "user@example.com"
+              otpCode:
+                type: string
+                example: "123456"
               token:
                 type: string
-            required: [token]
+                description: "Optional verification token string"
     responses:
       '200':
         description: Email verified successfully (or already verified)

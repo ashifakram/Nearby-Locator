@@ -1,8 +1,8 @@
 import React from 'react';
 
 export default function AdminApiDocsPage() {
-  // Use relative path or configure URL
-  const swaggerUrl = '/api-docs/v1';
+  const backendBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+  const swaggerUrl = `${backendBaseUrl}/api-docs/v1/`;
 
   return (
     <div className="space-y-6 flex flex-col h-full w-full pb-8 pr-1">
